@@ -9,22 +9,47 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+```{r Librerías}
+library(tidyverse)
+library(here)
+library(sf)
+library(nngeo)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```
+```{r Carga de datos}
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+url_bsasdata <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/transporte-y-obras-publicas"
+url_premetro <- "https://cdn.buenosaires.gob.ar//datosabiertos/datasets/sbase/premetro"
 
-```{r cars}
-summary(cars)
+#Comunas
+comunas_caba <- st_read("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson")
+
+#Premetro
+lineas_pre <- st_read(paste(url_premetro, "lineas_de_premetro.geojson", 
+                      sep = "/") )
+est_pre <- st_read(paste(url_premetro, "estaciones-premetro.csv", sep = "/"),
+                   options = "GEOM_POSSIBLE_NAMES=geometry",
+                   crs = 4326)
+
+reco_pre <- st_read(paste(url_premetro, "recorrido-premetro.csv", sep = "/"),
+                   options = "GEOM_POSSIBLE_NAMES=WKT",
+                   crs = 4326)
+#Subte
+frec_sub <- read.csv2 (paste(url_bsasdata,
+                   "frecuencia-subte","frecuencia_subte.csv",
+                   sep = "/" ) ) 
+
+est_sub <-  st_read(dsn = "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/sbase/subte-estaciones/estaciones-de-subte.geojson")
+                    
+bocas_sub <- st_read(dsn = "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/sbase/bocas-subte/bocas-de-subte.geojson") |> 
+  select(-matches("lineas_de_"))
+
+
+
+
+  
+         
+
+
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
