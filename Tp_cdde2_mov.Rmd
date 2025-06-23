@@ -53,8 +53,8 @@ td <- tempdir()
         exdir = td)
   barrios3 <- read_sf(fs::path(td, "barrios_vulnerables.shp"))
   rm(td)
-st_crs(barrios2)
-sum(!st_is_valid(barrios2))
+st_crs(barrios3)
+sum(!st_is_valid(barrios3))
 
   
 ```
@@ -78,11 +78,34 @@ Este conjunto de datos proporciona información sobre la ubicación, perímetro 
 
 
 ```{r Operaciones}
+barrios3 <- st_transform(barrios3, 4326)
+st_crs(barrios3)
+comunas <- st_transform(comunas, 4326)
+st_crs(comunas)
+
+barrios_j <- st_join(barrios3, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
+barrios_j2 <- st_join(comunas, barrios3, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
+
 
 ```
 
 
 
+```{r}
+ggplot(barrios_j2) +
+  geom_sf(aes(fill = is.na(comuna))) +
+  labs(title = "Barrios populares: ¿tienen comuna asignada?",
+       fill = "¿Tiene comuna?") +
+  theme_minimal()
+
+
+ggplot() +
+  geom_sf(data = comunas, fill = "grey90", color = "black") +
+  geom_sf(data = barrios_j, aes(fill = comuna), color = NA, alpha = 0.8) +
+  labs(title = "Ubicación de barrios populares dentro de CABA",
+       fill = "Comuna") +
+  theme_minimal()
+```
 
 
 
