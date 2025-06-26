@@ -86,15 +86,28 @@ barrios <- st_transform(barrios, 4326)
 st_crs(barrios)
 comunas <- st_transform(comunas, 4326)
 st_crs(comunas)
+educ <- st_transform(educ, 4326)
 
 barrios_j <- st_join(barrios, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
+
+barrios_selec <- barrios_j %>% filter(NOMBRE %in% c("Villa 31", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
+  mutate(NOMBRE = case_when(
+    NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 21-24" ~ "Villa_21-24"
+  ))
+barrios_selec <- barrios_selec %>%
+  mutate(NOMBRE = coalesce(NOMBRE, "Villa_31"))
+centroides_bar <- st_centroid(barrios_selec)
+distancias <- st_distance(centroides_bar, educ)
+
 
 
 ```
 
 
 
-```{r}
+```{r visualizaciones}
 ggplot(barrios_j2) +
   geom_sf(aes(fill = is.na(comuna))) +
   labs(title = "Barrios populares: ¿tienen comuna asignada?",
@@ -116,7 +129,13 @@ leaflet() %>%
               fillColor = "transparent",
               color = "black",
               weight = 1,
-              label = ~comuna)
+              label = ~comuna)%>%
+  addPolygons(data = barrios_j,
+              fillColor = "red",
+              color = "darkred",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~NOMBRE)
 
 ```
 
