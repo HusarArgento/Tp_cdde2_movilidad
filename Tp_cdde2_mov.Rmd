@@ -26,6 +26,9 @@ url_barrios2 <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministeri
 url_comunas <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
 url_educativos <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/establecimientos-educativos/establecimientos_educativos.geojson"
 
+url_socioecocaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/encuesta-anual-hogares/encuesta-anual-hogares-2019.csv"
+
+
 ```
 
 
@@ -74,6 +77,9 @@ sum(!st_is_valid(comunas))
 
 educ <- st_read(url_educativos)
 sum(!st_is_valid(educ))
+
+socioeco_caba <- read.csv(url_socioecocaba, fileEncoding = "latin1")
+
 ```
 #Comunas
 Este conjunto de datos proporciona información sobre la ubicación, perímetro y área de las comunas de la Ciudad de Buenos Aires, establecidas a partir de la Ley Orgánica de Comunas (Ley Nº 1777/2005). La información permite analizar la distribución territorial y la organización administrativa de la ciudad, facilitando estudios de planificación urbana y gestión pública.
@@ -103,8 +109,22 @@ cercanias <-  st_nearest_feature(centroides_bar, educ)
 centroides_bar2 <- centroides_bar %>%
   mutate(escuela_cercana = educ$nam[cercanias])
 
-centroides_bar3 <- centroides_bar2 %>% mutate(distancia = st_distance(geometry, educ$geometry)  
+centroides_bar3 <- centroides_bar2 %>% mutate(distancia_m = as.numeric (st_distance(geometry, educ[cercanias, ], by_element = TRUE)),
+                                          distancia_km = distancia_m / 1000
+                                          )
+#da numeros con unidades sin el as.numeric y segun claude y gpt eso dificulta para operaciones posteriores (preguntar a Pablo)
 
+#Ahora ya tenemos los colegios con las distancias mas cercanas!
+
+names(socioeco_caba)
+glimpse(socioeco_caba)
+socioec_com <- group_by(socioeco_caba, comuna) %>%
+  summarise(
+    ingreso_mediano = median(ingresos_familiares, na.rm  = TRUE),
+    ingreso_medio = mean(ingresos_familiares, nar.rm = TRUE ),
+    ) 
+com_ingreso <- left_join(comunas, socioec_com, by = "comuna")
+#Unimos un join espacial con uno no espacial
 ```
 
 
