@@ -14,7 +14,6 @@ library(tidyverse)
 library(here)
 library(sf)
 library(nngeo)
-install.packages("leaflet")
 library(leaflet)
 
 ```
@@ -100,8 +99,11 @@ barrios_selec <- barrios_selec %>%
   mutate(NOMBRE = coalesce(NOMBRE, "Villa_31"))
 centroides_bar <- st_centroid(barrios_selec)
 distancias <- st_distance(centroides_bar, educ)
+cercanias <-  st_nearest_feature(centroides_bar, educ)
+centroides_bar2 <- centroides_bar %>%
+  mutate(escuela_cercana = educ$nam[cercanias])
 
-
+centroides_bar3 <- centroides_bar2 %>% mutate(distancia = st_distance(geometry, educ$geometry)  
 
 ```
 
