@@ -14,6 +14,8 @@ library(tidyverse)
 library(here)
 library(sf)
 library(nngeo)
+install.packages("leaflet")
+library(leaflet)
 
 ```
 
@@ -23,6 +25,7 @@ url_barrios_pop <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/minist
 url_barrios2 <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-desarrollo-humano-y-habitat/barrios-populares"
 
 url_comunas <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
+url_educativos <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/establecimientos-educativos/establecimientos_educativos.geojson"
 
 ```
 
@@ -51,10 +54,10 @@ td <- tempdir()
                 destfile = fs::path(td, "barrios-populares-badata.zip") )
   unzip(zipfile = fs::path(td, "barrios-populares-badata.zip"),
         exdir = td)
-  barrios3 <- read_sf(fs::path(td, "barrios_vulnerables.shp"))
+  barrios <- read_sf(fs::path(td, "barrios_vulnerables.shp"))
   rm(td)
-st_crs(barrios3)
-sum(!st_is_valid(barrios3))
+st_crs(barrios)
+sum(!st_is_valid(barrios))
 
   
 ```
@@ -70,7 +73,8 @@ comunas <- st_read(url_comunas)
 st_crs(comunas)
 sum(!st_is_valid(comunas))
 
-
+educ <- st_read(url_educativos)
+sum(!st_is_valid(educ))
 ```
 #Comunas
 Este conjunto de datos proporciona información sobre la ubicación, perímetro y área de las comunas de la Ciudad de Buenos Aires, establecidas a partir de la Ley Orgánica de Comunas (Ley Nº 1777/2005). La información permite analizar la distribución territorial y la organización administrativa de la ciudad, facilitando estudios de planificación urbana y gestión pública.
@@ -78,13 +82,12 @@ Este conjunto de datos proporciona información sobre la ubicación, perímetro 
 
 
 ```{r Operaciones}
-barrios3 <- st_transform(barrios3, 4326)
-st_crs(barrios3)
+barrios <- st_transform(barrios, 4326)
+st_crs(barrios)
 comunas <- st_transform(comunas, 4326)
 st_crs(comunas)
 
-barrios_j <- st_join(barrios3, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
-barrios_j2 <- st_join(comunas, barrios3, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
+barrios_j <- st_join(barrios, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
 
 
 ```
@@ -105,6 +108,16 @@ ggplot() +
   labs(title = "Ubicación de barrios populares dentro de CABA",
        fill = "Comuna") +
   theme_minimal()
+
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(data = comunas,
+              fillColor = "transparent",
+              color = "black",
+              weight = 1,
+              label = ~comuna)
+
 ```
 
 
