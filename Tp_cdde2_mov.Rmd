@@ -125,6 +125,44 @@ socioec_com <- group_by(socioeco_caba, comuna) %>%
     ) 
 com_ingreso <- left_join(comunas, socioec_com, by = "comuna")
 #Unimos un join espacial con uno no espacial
+
+barrios_cmya <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta")) %>% st_centroid()
+#Seleccionamos barrios y como es una geometria multipoligon le hacems centroides
+
+cmya_cercanias <-  st_nearest_feature(barrios_cmya, educ) 
+barrios_cmyaed2 <- barrios_cmya %>% mutate(escuela_cercana = educ$nam[cmya_cercanias], 
+                                          distancia_m = as.numeric(st_distance(geometry,
+                                                                               educ[cmya_cercanias, ],
+                                                                               by_element =TRUE)),
+                                          distancia_km = as.numeric(st_distance(geometry,                                                                                educ[cmya_cercanias,],
+                                                                                by_element = TRUE)
+                                          ) / 1000
+)
+
+
+comparacion_distancias <- bind_rows(centroides_bar3 %>% mutate(niv_socioeco = "Barrio Popular"),
+                                    barrios_cmyaed2 %>% mutate(niv_socioeco = case_when 
+                                                               (barrios== "Recoleta" ~ "Clase Alta",
+                                                                 barrios == "Almagro, Boedo" ~ "Clase Media",
+                                                                 barrios == "Caballito" ~ "Clase Media Alta",
+                                                                 TRUE ~ "Desconocido" )))
+#Ocurre que no tienen los mismos campos. Vamos a armar una tabla:
+#1) Renombramos y colectamos las mismas columnas
+
+barrios_pcomp <- centroides_bar3 %>%
+  rename( barrio = NOMBRE,) %>%
+  mutate(niv_socioeco = "Barrio Popular") %>%
+  select(barrio, comuna, niv_socioeco, escuela_cercana,  distancia_m, distancia_km, geometry)
+
+barrios_cmyaed2 <- barrios_cmyaed2 %>%
+  rename( barrio = barrios,) %>%
+  mutate( niv_socioeco = case_when(
+      barrio == "Recoleta" ~ "Clase Alta",
+      barrio == "Almagro, Boedo" ~ "Clase Media",
+      barrio == "Caballito" ~ "Clase Media Alta", TRUE ~ "Desconocido")) %>% 
+        select(barrio, comuna, niv_socioeco, escuela_cercana,  distancia_m, distancia_km, geometry)
+comparacion_distancias <- bind_rows(barrios_pcomp, barrios_cmyaed2)
+
 ```
 
 
@@ -159,6 +197,20 @@ leaflet() %>%
               fillOpacity = 0.6,
               label = ~NOMBRE)
 
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(data = comunas,
+              fillColor = "transparent",
+              color = "black",
+              weight = 1,
+              label = ~comuna)%>%
+  addPolygons(data = com_ingreso,
+              fillColor = "red",
+              color = "darkred",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~barrios)
 ```
 
 
