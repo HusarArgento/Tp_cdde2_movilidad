@@ -32,21 +32,7 @@ url_socioecocaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direc
 ```
 
 
-```{r Carga de datos 1}
-
-barrios_pop <- st_read(url_barrios_pop)
-st_crs(barrios_pop)
-sum(!st_is_valid(barrios_pop))
-
-#391 geometrías invalidas
-#Corrijo
-barrios_pop <- st_make_valid(barrios_pop)
-sum(!st_is_valid(barrios_pop))
-
-#Preguntar a Pablo porque me sigue dando mal
-
-```
-
+`
 
 ```{r Posibilidad 2: Shape}
 td <- tempdir()
@@ -126,8 +112,12 @@ socioec_com <- group_by(socioeco_caba, comuna) %>%
 com_ingreso <- left_join(comunas, socioec_com, by = "comuna")
 #Unimos un join espacial con uno no espacial
 
-barrios_cmya <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta")) %>% st_centroid()
-#Seleccionamos barrios y como es una geometria multipoligon le hacems centroides
+# barrios_cmya <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta")) %>% st_centroid()
+#Seleccionamos barrios peroy como es una geometria multipoligon le hacems centroides (esto no va porque necesito los barrios cmya como multipoligons para leafleet)
+
+barrios_cmym <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta"))
+barrios_cmya <- st_centroid(barrios_cmym)
+
 
 cmya_cercanias <-  st_nearest_feature(barrios_cmya, educ) 
 barrios_cmyaed2 <- barrios_cmya %>% mutate(escuela_cercana = educ$nam[cmya_cercanias], 
@@ -211,6 +201,62 @@ leaflet() %>%
               weight = 1,
               fillOpacity = 0.6,
               label = ~barrios)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(data = comunas,
+              fillColor = "transparent",
+              color = "black",
+              weight = 1,
+              label = ~comuna)%>%
+  addCircleMarkers(data = barrios_pcomp, #reemplazar addpolygons por addcirclemarkers porque son gm de puntos
+              fillColor = "red",
+              color = "darkred",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~barrios) %>%
+  addCircleMarkers(data = barrios_cmyaed2,
+              fillColor = "blue",
+              color = "darkblue",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~barrios)
+#Este no se ve claramente. Probamos otro poniendo los barrios multipoligons
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(data = comunas,
+              fillColor = "transparent",
+              color = "black",
+              weight = 1,
+              label = ~comuna)%>%
+  addPolygons (data = barrios_selec, 
+              fillColor = "red",
+              color = "darkred",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~barrios) %>%
+  addPolygons(data = barrios_cmym,
+              fillColor = "blue",
+              color = "darkblue",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~barrios) %>% 
+  addCircleMarkers(data = barrios_pcomp,
+                   radius = 6,
+                   color = "darkorange",
+                   fillColor = "orange",
+                   fillOpacity = 0.8,
+                   stroke = FALSE,
+                   label = ~paste0(barrio, ": ", escuela_cercana),
+                   popup = ~paste0(
+                     "<strong>Barrio:</strong> ", barrio, "<br>",
+                     "<strong>Escuela más cercana:</strong> ", escuela_cercana, "<br>",
+                     "<strong>Distancia:</strong> ", round(distancia_km, 2), " km"
+                   ))
+
+
+
 ```
 
 
