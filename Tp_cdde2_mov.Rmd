@@ -114,7 +114,7 @@ com_ingreso <- left_join(comunas, socioec_com, by = "comuna")
 
 # barrios_cmya <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta")) %>% st_centroid()
 #Seleccionamos barrios peroy como es una geometria multipoligon le hacems centroides (esto no va porque necesito los barrios cmya como multipoligons para leafleet)
-
+ 
 barrios_cmym <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta"))
 barrios_cmya <- st_centroid(barrios_cmym)
 
@@ -129,7 +129,8 @@ barrios_cmyaed2 <- barrios_cmya %>% mutate(escuela_cercana = educ$nam[cmya_cerca
                                           ) / 1000
 )
 
-
+escuelas_cercanas <- educ %>% filter(nam %in% barrios_cmyaed2$escuela_cercana) #Para Leafleet
+escuelas_cercanas2 <- educ %>% filter(nam %in% barrios_pcomp$escuela_cercana)
 comparacion_distancias <- bind_rows(centroides_bar3 %>% mutate(niv_socioeco = "Barrio Popular"),
                                     barrios_cmyaed2 %>% mutate(niv_socioeco = case_when 
                                                                (barrios== "Recoleta" ~ "Clase Alta",
@@ -152,6 +153,11 @@ barrios_cmyaed2 <- barrios_cmyaed2 %>%
       barrio == "Caballito" ~ "Clase Media Alta", TRUE ~ "Desconocido")) %>% 
         select(barrio, comuna, niv_socioeco, escuela_cercana,  distancia_m, distancia_km, geometry)
 comparacion_distancias <- bind_rows(barrios_pcomp, barrios_cmyaed2)
+
+barrios_cmyaed3 <- barrios_cmyaed2 %>%
+  left_join(educ %>% select(nam, geometry), by = c("escuela_cercana" = "nam")) %>%
+  rename(geom_escuela = geometry.y) %>%
+  st_as_sf(crs = st_crs(barrios_cmyaed2))
 
 ```
 
@@ -223,37 +229,40 @@ leaflet() %>%
               label = ~barrios)
 #Este no se ve claramente. Probamos otro poniendo los barrios multipoligons
 
-leaflet() %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  addPolygons(data = comunas,
-              fillColor = "transparent",
-              color = "black",
-              weight = 1,
-              label = ~comuna)%>%
-  addPolygons (data = barrios_selec, 
-              fillColor = "red",
-              color = "darkred",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~barrios) %>%
-  addPolygons(data = barrios_cmym,
-              fillColor = "blue",
-              color = "darkblue",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~barrios) %>% 
-  addCircleMarkers(data = barrios_pcomp,
-                   radius = 6,
-                   color = "darkorange",
-                   fillColor = "orange",
-                   fillOpacity = 0.8,
-                   stroke = FALSE,
-                   label = ~paste0(barrio, ": ", escuela_cercana),
-                   popup = ~paste0(
-                     "<strong>Barrio:</strong> ", barrio, "<br>",
-                     "<strong>Escuela más cercana:</strong> ", escuela_cercana, "<br>",
-                     "<strong>Distancia:</strong> ", round(distancia_km, 2), " km"
-                   ))
+  leaflet() %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    addPolygons(data = comunas,
+                fillColor = "transparent",
+                color = "black",
+                weight = 1,
+                label = ~comuna)%>%
+    addPolygons (data = barrios_selec, 
+                fillColor = "red",
+                color = "darkred",
+                weight = 1,
+                fillOpacity = 0.6,
+                label = ~barrios) %>%
+    addPolygons(data = barrios_cmym,
+                fillColor = "blue",
+                color = "darkblue",
+                weight = 1,
+                fillOpacity = 0.6,
+                label = ~barrios) %>% 
+    addCircleMarkers(data = escuelas_cercanas,
+                     radius = 6,
+                     color = "darkorange",
+                     fillColor = "orange",
+                     fillOpacity = 0.8,
+                     label = ~escuelas_cercanas,
+                     popup = ~paste0("<strong>Escuela:</strong> ", escuelas_cercanas)) %>%
+    addCircleMarkers(data = escuelas_cercanas2,
+                     radius = 6,
+                     color = "darkgreen",
+                     fillColor = "green",
+                     fillOpacity = 0.8,
+                     label = ~escuelas_cercanas,
+                     popup = ~paste0("<strong>Escuela:</strong> ", escuelas_cercanas))
+                    
 
 
 
