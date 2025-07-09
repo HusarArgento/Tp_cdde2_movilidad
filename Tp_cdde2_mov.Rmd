@@ -29,6 +29,12 @@ url_educativos <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministe
 url_socioecocaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/encuesta-anual-hogares/encuesta-anual-hogares-2019.csv"
 
 
+url_radiocensalcaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/informacion-censal-por-radio/caba_radios_censales.geojson"
+
+
+
+
+
 ```
 
 
@@ -57,6 +63,10 @@ Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbaniz
 
 ```{r Carga de datos 2}
 
+radios <- st_read(url_radiocensalcaba)
+st_crs(comunas)
+sum(!st_is_valid(comunas))
+
 comunas <- st_read(url_comunas)
 st_crs(comunas)
 sum(!st_is_valid(comunas))
@@ -78,6 +88,9 @@ st_crs(barrios)
 comunas <- st_transform(comunas, 4326)
 st_crs(comunas)
 educ <- st_transform(educ, 4326)
+radios <- st_transform(radios, 4326)
+st_crs(radios)
+
 
 barrios_j <- st_join(barrios, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
 
