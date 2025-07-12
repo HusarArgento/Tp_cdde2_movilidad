@@ -34,7 +34,7 @@ url_socioecocaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direc
 
 `
 
-```{r Posibilidad 2: Shape}
+```{r Carga de datos}
 td <- tempdir()
   download.file(url = paste(url_barrios2,
                             "barrios-populares-badata.zip",
@@ -47,16 +47,6 @@ td <- tempdir()
 st_crs(barrios)
 sum(!st_is_valid(barrios))
 
-  
-```
-#Barrios populares 
-Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
-#TIPO_ASENT		
-Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
-
-
-```{r Carga de datos 2}
-
 comunas <- st_read(url_comunas)
 st_crs(comunas)
 sum(!st_is_valid(comunas))
@@ -66,7 +56,13 @@ sum(!st_is_valid(educ))
 
 socioeco_caba <- read.csv(url_socioecocaba, fileEncoding = "latin1")
 
+  
 ```
+#Barrios populares 
+Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
+#TIPO_ASENT		
+Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
+
 #Comunas
 Este conjunto de datos proporciona información sobre la ubicación, perímetro y área de las comunas de la Ciudad de Buenos Aires, establecidas a partir de la Ley Orgánica de Comunas (Ley Nº 1777/2005). La información permite analizar la distribución territorial y la organización administrativa de la ciudad, facilitando estudios de planificación urbana y gestión pública.
 
@@ -78,27 +74,27 @@ st_crs(barrios)
 comunas <- st_transform(comunas, 4326)
 st_crs(comunas)
 educ <- st_transform(educ, 4326)
+#Nos aseguramos que todos los barrios estan en el mismo CRC
 
-barrios_j <- st_join(barrios, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan
-
+barrios_j <- st_join(barrios, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan entre barrios populares y comunas.
 barrios_selec <- barrios_j %>% filter(NOMBRE %in% c("Villa 31", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
   mutate(NOMBRE = case_when(
     NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
     NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
     NOMBRE == "Villa 21-24" ~ "Villa_21-24"
-  ))
-barrios_selec <- barrios_selec %>%
-  mutate(NOMBRE = coalesce(NOMBRE, "Villa_31"))
-centroides_bar <- st_centroid(barrios_selec)
-distancias <- st_distance(centroides_bar, educ)
-cercanias <-  st_nearest_feature(centroides_bar, educ)
-centroides_bar2 <- centroides_bar %>%
-  mutate(escuela_cercana = educ$nam[cercanias])
+  )) #Renombramos para que sea mas facil manejar el dato
 
-centroides_bar3 <- centroides_bar2 %>% mutate(distancia_m = as.numeric (st_distance(geometry, educ[cercanias, ], by_element = TRUE)),
-                                          distancia_km = distancia_m / 1000
-                                          )
-#da numeros con unidades sin el as.numeric y segun claude y gpt eso dificulta para operaciones posteriores (preguntar a Pablo)
+barrios_selec <- barrios_selec %>%
+  mutate(NOMBRE = coalesce(NOMBRE, "Villa_31")) #esto para que renombre los NA como Villa 31 que es el primer string
+centroides_bar <- st_centroid(barrios_selec) #trazamos centroides en barrios para la posterior medicion de distancias
+distancias <- st_distance(centroides_bar, educ) #Medimos (las escuelas estan en geometria punto)
+cercanias <-  st_nearest_feature(centroides_bar, educ) #Vemos cuales son las mas cercanas, quedan en el vector
+centroides_bar2 <- centroides_bar %>% #el vector almacena numero y posicionamiento, lo cruzamos con centroides y
+  mutate(escuela_cercana = educ$nam[cercanias]) #...traemos los nombres de las escuelas más cercanas.
+
+centroides_bar3 <- centroides_bar2 %>% mutate(distancia_m = as.numeric (st_distance(geometry, educ[cercanias, ], by_element = TRUE)), 
+                                              distancia_km = distancia_m / 1000)
+#da numeros con unidades, si no pongo  el as.numeric y segun claude y gpt eso dificulta para operaciones posteriores (preguntar a Pablo)
 
 #Ahora ya tenemos los colegios con las distancias mas cercanas!
 
@@ -108,16 +104,16 @@ socioec_com <- group_by(socioeco_caba, comuna) %>%
   summarise(
     ingreso_mediano = median(ingresos_familiares, na.rm  = TRUE),
     ingreso_medio = mean(ingresos_familiares, nar.rm = TRUE ),
-    ) 
+    ) #Sacamos  medias y medianas de ingresos familiares luego de agrupar por comunas
 com_ingreso <- left_join(comunas, socioec_com, by = "comuna")
-#Unimos un join espacial con uno no espacial
+#Unimos un join espacial con uno no espacial!
 
 # barrios_cmya <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta")) %>% st_centroid()
 #Seleccionamos barrios peroy como es una geometria multipoligon le hacems centroides (esto no va porque necesito los barrios cmya como multipoligons para leafleet)
  
 barrios_cmym <- com_ingreso %>% filter(barrios %in% c("Caballito", "Almagro, Boedo", "Recoleta"))
 barrios_cmya <- st_centroid(barrios_cmym)
-
+#Esto lo hacemos para representar en leafleet
 
 cmya_cercanias <-  st_nearest_feature(barrios_cmya, educ) 
 barrios_cmyaed2 <- barrios_cmya %>% mutate(escuela_cercana = educ$nam[cmya_cercanias], 
@@ -128,7 +124,7 @@ barrios_cmyaed2 <- barrios_cmya %>% mutate(escuela_cercana = educ$nam[cmya_cerca
                                                                                 by_element = TRUE)
                                           ) / 1000
 )
-
+#Aca  vamos a hacer integrar ambos datasets para ver la distancias
 escuelas_cercanas <- educ %>% filter(nam %in% barrios_cmyaed2$escuela_cercana) #Para Leafleet
 escuelas_cercanas2 <- educ %>% filter(nam %in% barrios_pcomp$escuela_cercana)
 comparacion_distancias <- bind_rows(centroides_bar3 %>% mutate(niv_socioeco = "Barrio Popular"),
@@ -152,12 +148,15 @@ barrios_cmyaed2 <- barrios_cmyaed2 %>%
       barrio == "Almagro, Boedo" ~ "Clase Media",
       barrio == "Caballito" ~ "Clase Media Alta", TRUE ~ "Desconocido")) %>% 
         select(barrio, comuna, niv_socioeco, escuela_cercana,  distancia_m, distancia_km, geometry)
+
+#Ahora sí, unimos
 comparacion_distancias <- bind_rows(barrios_pcomp, barrios_cmyaed2)
 
-barrios_cmyaed3 <- barrios_cmyaed2 %>%
-  left_join(educ %>% select(nam, geometry), by = c("escuela_cercana" = "nam")) %>%
-  rename(geom_escuela = geometry.y) %>%
-  st_as_sf(crs = st_crs(barrios_cmyaed2))
+# Esto no 
+#barrios_cmyaed3 <- barrios_cmyaed2 %>%
+#  left_join(educ %>% select(nam, geometry), by = c("escuela_cercana" = "nam")) %>%
+#  rename(geom_escuela = geometry.y) %>%
+#  st_as_sf(crs = st_crs(barrios_cmyaed2))
 
 ```
 
