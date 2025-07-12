@@ -40,6 +40,19 @@ list.files(td, pattern = "\\.shp$", recursive = TRUE)
 radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
 rm(td)
 
+td <- tempdir()
+rar_path <- path(td, "Shapes.rar")
+download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
+system(paste('"C:/Program Files/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+list.files(td, pattern = "\\.shp$", recursive = TRUE)
+radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
+rm(td)
+st_crs(radios2)
+sum(!st_is_valid(radios2))
+list.files(td, recursive = TRUE)
+
+
+
 #Zip
 td <- tempdir()
 download.file(url = paste(url_barrios2,

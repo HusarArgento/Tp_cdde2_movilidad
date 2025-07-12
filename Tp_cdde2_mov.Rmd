@@ -20,20 +20,20 @@ library(fs)
 ```
 
 ```{r Urls}
-url_barrios_pop <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-desarrollo-humano-y-habitat/barrios-populares/barrios_populares_badata_WGS84.geojson"
+
 
 url_barrios2 <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-desarrollo-humano-y-habitat/barrios-populares"
 
 url_comunas <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
-url_educativos <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/establecimientos-educativos/establecimientos_educativos.geojson"
 
-url_socioecocaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/encuesta-anual-hogares/encuesta-anual-hogares-2019.csv"
+url_educativos <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/establecimientos-educativos/establecimientos_educativos.geojson"
 
 
 url_radiocensalcaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/informacion-censal-por-radio/caba_radios_censales.geojson"
 
-
 url_radiosamba <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Shapes.rar"
+
+url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empleo-AMBA.csv"
 
 
 
@@ -41,25 +41,73 @@ url_radiosamba <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Shapes.
 
 
 ```{r}
+#1 Carga de datos
+#1.1 Mapa base Radio Censales AMBA
+
 td <- tempdir()
 rar_path <- path(td, "Shapes.rar")
 download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
-system(paste('"C:/Program Files/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+system(paste('"D:/PROGRAMS-HDD/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
 list.files(td, pattern = "\\.shp$", recursive = TRUE)
 radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
+list.files(td, recursive = TRUE)
 rm(td)
 st_crs(radios2)
 sum(!st_is_valid(radios2))
-list.files(td, recursive = TRUE)
-
-<<<<<<< HEAD
-```{r Carga de datos}
-=======
+radios2 <- st_transform(radios2, 4326)
 ```
 
 
+```{r}
+#Dataset ingreso medio AMBA (2022)
+radio_socioeco <- read.csv(url_radiosocioeco, fileEncoding = "latin1")
+```
+
+```{r}
+#Join Df Espacial/No Espacial: Mapa de Radio Censales e Ingresos 
+
+mapa_eco <- left_join(radios2, radio_socioeco, by = c("CO_FRAC_RA" = "LINK" ) ) %>%
+  filter(!is.na(Remuneracion_media)) 
+
+```
+
+```{r}
+
+#Ordenamos y clasificamos los clusters
+
+baires_ecorad <- mapa_eco  %>% filter(provincia_id == 2) #Filtrado de CABA
+baires_q <- baires_ecorad %>% mutate(cluster = case_when(
+  Remuneracion_media <= quantile(Remuneracion_media, 0.25)~ "Clase media baja", 
+  Remuneracion_media <= quantile(Remuneracion_media, 0.50)~ "Clase media",
+  Remuneracion_media <= quantile(Remuneracion_media, 0.75)~ "Clase media alta",
+  Remuneracion_media > quantile(Remuneracion_media, 0.75)~ "Clase  alta"
+))
+#Clasificamos clusters
+table(baires_q$cluster)
+  
+```
+```{r}
+#Cargamos un mapa de radiocensales de CABA para que nos oficie de base
+radio_bsas <-  st_read(url_radiocensalcaba)
+st_crs(radio_bsas)
+sum(!st_is_valid(radio_bsas))
+radio_bsas <- st_transform(radio_bsas, 4326)
+```
+
+
+```{r}
+#Primera visualizacion: Distribucion socio economica de caba
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "black") +  # mapa base
+  geom_sf(data = baires_q, aes(fill = cluster)) +              # capa temática
+  theme_minimal()+ 
+  labs(title = "Distribución de clases sociales sobre mapa base", fill = "Clase")
+
+```
+
+
+
 ```{r Barrios Populares}
->>>>>>> b886060a798116a9c9820414db96950b222fdf2f
 td <- tempdir()
   download.file(url = paste(url_barrios2,
                             "barrios-populares-badata.zip",
@@ -72,9 +120,6 @@ td <- tempdir()
 st_crs(barrios)
 sum(!st_is_valid(barrios))
 
-<<<<<<< HEAD
-=======
-  
 ```
 #Barrios populares 
 Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
@@ -99,7 +144,6 @@ radios <- st_read(url_radiocensalcaba)
 st_crs(comunas)
 sum(!st_is_valid(comunas))
 
->>>>>>> b886060a798116a9c9820414db96950b222fdf2f
 comunas <- st_read(url_comunas)
 st_crs(comunas)
 sum(!st_is_valid(comunas))
@@ -127,13 +171,13 @@ st_crs(barrios)
 comunas <- st_transform(comunas, 4326)
 st_crs(comunas)
 educ <- st_transform(educ, 4326)
-<<<<<<< HEAD
+HEAD
 #Nos aseguramos que todos los barrios estan en el mismo CRC
-=======
+
 radios <- st_transform(radios, 4326)
 st_crs(radios)
 
->>>>>>> b886060a798116a9c9820414db96950b222fdf2f
+
 
 barrios_j <- st_join(barrios, comunas, join = st_intersects) #Unimos solo las partes de la geometría que se intersectan entre barrios populares y comunas.
 barrios_selec <- barrios_j %>% filter(NOMBRE %in% c("Villa 31", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%

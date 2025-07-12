@@ -8,6 +8,23 @@ ggplot(radios) +
        fill = "¿Tiene comuna?") +
   theme_minimal()
 
+ggplot(baires_q) +
+  geom_sf(aes (fill = cluster))
+theme_minimal()
+
+ggplot(baires_q) +
+  geom_sf(aes(fill = cluster)) +
+  scale_fill_manual(
+    values = c(
+      "Clase media baja" = "#fddbc7",
+      "Clase media" = "#f4a582",
+      "Clase media alta" = "#d6604d",
+      "Clase alta" = "#67001f"
+    )
+  ) +
+  theme_minimal() +
+  labs(title = "Mapa socioeconómico por cuartiles de ingreso", fill = "Clase social")
+
 
 ggplot(barrios_j2) +
   geom_sf(aes(fill = is.na(comuna))) +
