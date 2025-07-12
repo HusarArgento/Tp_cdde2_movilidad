@@ -15,6 +15,7 @@ library(here)
 library(sf)
 library(nngeo)
 library(leaflet)
+library(fs)
 
 ```
 
@@ -32,15 +33,29 @@ url_socioecocaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direc
 url_radiocensalcaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/informacion-censal-por-radio/caba_radios_censales.geojson"
 
 
+url_radiosamba <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Shapes.rar"
 
 
 
 ```
 
 
-`
+```{r}
+td <- tempdir()
+rar_path <- path(td, "Shapes.rar")
+download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
+system(paste('"C:/Program Files/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+list.files(td, pattern = "\\.shp$", recursive = TRUE)
+radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
+rm(td)
+st_crs(radios2)
+sum(!st_is_valid(radios2))
+list.files(td, recursive = TRUE)
 
-```{r Posibilidad 2: Shape}
+```
+
+
+```{r Barrios Populares}
 td <- tempdir()
   download.file(url = paste(url_barrios2,
                             "barrios-populares-badata.zip",
@@ -59,6 +74,17 @@ sum(!st_is_valid(barrios))
 Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
 #TIPO_ASENT		
 Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
+
+
+```{r}
+#Primera visualizacion barrios pop en radio censales
+ggplot() +
+  geom_sf(data = radios, fill = "grey90", color = "black", size = 0.1) +
+  geom_sf(data = barrios, fill = "red", color = "darkred", alpha = 0.) +
+  labs(title = "Ubicación de barrios populares  de CABA - Radiocensales",
+       fill = "Comuna") +
+  theme_minimal()
+```
 
 
 ```{r Carga de datos 2}
@@ -176,110 +202,6 @@ barrios_cmyaed3 <- barrios_cmyaed2 %>%
 
 
 
-```{r visualizaciones}
-ggplot(barrios_j2) +
-  geom_sf(aes(fill = is.na(comuna))) +
-  labs(title = "Barrios populares: ¿tienen comuna asignada?",
-       fill = "¿Tiene comuna?") +
-  theme_minimal()
-
-
-ggplot() +
-  geom_sf(data = comunas, fill = "grey90", color = "black") +
-  geom_sf(data = barrios_j, aes(fill = comuna), color = NA, alpha = 0.8) +
-  labs(title = "Ubicación de barrios populares dentro de CABA",
-       fill = "Comuna") +
-  theme_minimal()
-
-
-leaflet() %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  addPolygons(data = comunas,
-              fillColor = "transparent",
-              color = "black",
-              weight = 1,
-              label = ~comuna)%>%
-  addPolygons(data = barrios_j,
-              fillColor = "red",
-              color = "darkred",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~NOMBRE)
-
-
-leaflet() %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  addPolygons(data = comunas,
-              fillColor = "transparent",
-              color = "black",
-              weight = 1,
-              label = ~comuna)%>%
-  addPolygons(data = com_ingreso,
-              fillColor = "red",
-              color = "darkred",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~barrios)
-
-leaflet() %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  addPolygons(data = comunas,
-              fillColor = "transparent",
-              color = "black",
-              weight = 1,
-              label = ~comuna)%>%
-  addCircleMarkers(data = barrios_pcomp, #reemplazar addpolygons por addcirclemarkers porque son gm de puntos
-              fillColor = "red",
-              color = "darkred",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~barrios) %>%
-  addCircleMarkers(data = barrios_cmyaed2,
-              fillColor = "blue",
-              color = "darkblue",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~barrios)
-#Este no se ve claramente. Probamos otro poniendo los barrios multipoligons
-
-  leaflet() %>%
-    addProviderTiles("CartoDB.Positron") %>%
-    addPolygons(data = comunas,
-                fillColor = "transparent",
-                color = "black",
-                weight = 1,
-                label = ~comuna)%>%
-    addPolygons (data = barrios_selec, 
-                fillColor = "red",
-                color = "darkred",
-                weight = 1,
-                fillOpacity = 0.6,
-                label = ~barrios) %>%
-    addPolygons(data = barrios_cmym,
-                fillColor = "blue",
-                color = "darkblue",
-                weight = 1,
-                fillOpacity = 0.6,
-                label = ~barrios) %>% 
-    addCircleMarkers(data = escuelas_cercanas,
-                     radius = 6,
-                     color = "darkorange",
-                     fillColor = "orange",
-                     fillOpacity = 0.8,
-                     label = ~escuelas_cercanas,
-                     popup = ~paste0("<strong>Escuela:</strong> ", escuelas_cercanas)) %>%
-    addCircleMarkers(data = escuelas_cercanas2,
-                     radius = 6,
-                     color = "darkgreen",
-                     fillColor = "green",
-                     fillOpacity = 0.8,
-                     label = ~escuelas_cercanas,
-                     popup = ~paste0("<strong>Escuela:</strong> ", escuelas_cercanas))
-                    
-
-
-
-```
 
 
 
