@@ -87,7 +87,7 @@ table(baires_q$cluster)
   
 ```
 ```{r}
-#Cargamos un mapa de radiocensales de CABA para que nos oficie de base
+#Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base
 radio_bsas <-  st_read(url_radiocensalcaba)
 st_crs(radio_bsas)
 sum(!st_is_valid(radio_bsas))
