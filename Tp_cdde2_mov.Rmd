@@ -84,7 +84,7 @@ baires_ecorad <- mapa_eco  %>% filter(provincia_id == 2, Remuneracion_media > 30
 baires_q <- baires_ecorad %>% mutate(cluster = case_when( 
   Remuneracion_media <= quantile(Remuneracion_media, 0.25, na.rm = TRUE) ~ "Clase baja",
   Remuneracion_media <= quantile(Remuneracion_media, 0.50, na.rm = TRUE) ~ "Clase media",  
-  Remuneracion_media <= quantile(Remuneracion_media, 0.75, na.rm = TRUE) ~ "Clase media alta",
+  Remuneracion_media <= quantile(Remuneracion_media, 0.75, na.rm = TRUE) ~ "Clase media alta", 
   TRUE ~ "Clase alta"
   ))
 
@@ -95,9 +95,7 @@ sum(!st_is_valid(barrios_caba))
 barrios_caba <- st_transform(barrios_caba, 4326)
 barrios_q2 <- st_join(baires_q, barrios_caba, join = st_intersects)
 barrios_q3 <- barrios_q2 %>% select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro)
-barrios_q3 %>% 
-  filter(cluster == "Clase media") %>%
-  filter(Remuneracion_media == max(Remuneracion_media, na.rm = TRUE))
+
 
 ```
 
