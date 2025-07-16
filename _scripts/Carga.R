@@ -50,7 +50,7 @@ rm(td)
 st_crs(radios2)
 sum(!st_is_valid(radios2))
 list.files(td, recursive = TRUE)
-
+#D:\PROGRAMS-HDD\Winrar
 
 
 #Zip

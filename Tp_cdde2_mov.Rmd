@@ -49,7 +49,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 td <- tempdir()
 rar_path <- path(td, "Shapes.rar")
 download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
-system(paste('"C:/Program Files/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+system(paste('"D:/PROGRAMS-HDD/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
 list.files(td, pattern = "\\.shp$", recursive = TRUE)
 radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
 list.files(td, recursive = TRUE)
@@ -94,10 +94,30 @@ st_crs(barrios_caba)
 sum(!st_is_valid(barrios_caba))
 barrios_caba <- st_transform(barrios_caba, 4326)
 barrios_q2 <- st_join(baires_q, barrios_caba, join = st_intersects)
-barrios_q3 <- barrios_q2 %>% select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro)
+barrios_q3 <- barrios_q2 %>% 
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
+  rename(barrios_nom = nombre)
+
 
 
 ```
+
+```{r}
+#Agrupamos y elegimos comunas
+barrios_q4 <- barrios_q3 %>%
+  filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
+           barrios_nom == "Caballito" & cluster == "Clase media alta"|
+           barrios_nom == "Almagro" & cluster == "Clase media" ) %>%
+  group_by(barrios_nom) %>%
+  arrange(desc (Remuneracion_media)) %>%
+  slice_head(n=8) %>%
+  ungroup()
+
+```
+
+
+
+
 
 ```{r}
 #Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base
@@ -120,34 +140,15 @@ ggplot() +
 
 
 ```{r}
-ggplot(barrios_q) +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "black") +
-  geom_sf(aes(fill = cluster), color = "white", size = 0.1) +
-  geom_sf_text(data = comunas_caba, aes(label = barrios), 
-               color = "black", size = 3, fontface = "bold")+
-  scale_fill_manual(
-    values = c(
-      "Clase baja" = "#f2dede",
-      "Clase media" = "#f9bfbf",
-      "Clase media alta" = "#f08080",
-      "Clase alta" = "#c0392b"
-    )
-  ) +
-  theme_minimal() +
-  labs(title = "Distribución de clases sociales por radiocensal en CABA",
-       fill = "Clase Social")
-
-pal <- colorFactor(palette = "Set1", domain = baires_q$cluster)
-leaflet() %>%
-  addProviderTiles("CartoDB.Positron") %>% 
-  addPolygons(data = baires_q, 
-              fillColor =  ~pal(cluster),
-              color = "darkred",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~ Remuneracion_media)
 
 
+
+
+ggplot() + 
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
+  geom_sf(data = barrios_q4, aes(fill = barrios_nom), color = "white", size = 0.2) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal()
 ```
 
 
