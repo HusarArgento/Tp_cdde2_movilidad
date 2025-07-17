@@ -56,7 +56,7 @@ list.files(td, recursive = TRUE)
 rm(td)
 st_crs(radios2)
 sum(!st_is_valid(radios2))
-radios2 <- st_transform(radios2, 4326)
+radios2 <- st_transform(radios2, 5347)
 ```
 
 
@@ -92,7 +92,7 @@ baires_q <- baires_ecorad %>% mutate(cluster = case_when(
 barrios_caba <- st_read(url_barrioscaba)
 st_crs(barrios_caba)
 sum(!st_is_valid(barrios_caba))
-barrios_caba <- st_transform(barrios_caba, 4326)
+barrios_caba <- st_transform(barrios_caba, 5347)
 barrios_q2 <- st_join(baires_q, barrios_caba, join = st_intersects)
 barrios_q3 <- barrios_q2 %>% 
   select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
@@ -101,6 +101,8 @@ barrios_q3 <- barrios_q2 %>%
 
 
 ```
+
+
 
 ```{r}
 #Agrupamos y elegimos comunas
@@ -124,33 +126,46 @@ barrios_q4 <- barrios_q3 %>%
 radio_bsas <-  st_read(url_radiocensalcaba)
 st_crs(radio_bsas)
 sum(!st_is_valid(radio_bsas))
-radio_bsas <- st_transform(radio_bsas, 4326)
+radio_bsas <- st_transform(radio_bsas, 5347)
 ```
-
-
 ```{r}
-#Primera visualizacion: Distribucion socio economica de caba
-ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "black") +  # mapa base
-  geom_sf(data = baires_q2, aes(fill = Remuneracion_media)) +              # capa temática
-  theme_minimal()+ 
-  labs(title = "Distribución de clases sociales sobre mapa base", fill = "Clase")
-
-```
-
-
-```{r}
-
-
-
-
+#Primera visualizacion: Distribucion socio economica de caba  
 ggplot() + 
   geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
   geom_sf(data = barrios_q4, aes(fill = barrios_nom), color = "white", size = 0.2) +
   scale_fill_brewer(palette = "Set1") +
   theme_minimal()
 ```
+```{r}
+#Hacemos los buffers respecto de cada radio censal elegido
+buffers_multi <- bind_rows(
+  barrios_q4 %>% st_buffer(dist = 500) %>% mutate(distancia = "500m"), 
+  barrios_q4 %>% st_buffer(dist = 1000) %>% mutate(distancia = "1000m"), 
+  barrios_q4 %>% st_buffer(dist = 2000) %>% mutate(distancia = "2000m")
+)
 
+#cargamos las escuelas
+educ <- st_read(url_educativos)
+sum(!st_is_valid(educ))
+educ2 <- st_transform(educ, 5347) %>% 
+  select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
+
+barrios_educ <- st_join(buffers_multi, educ2, join = st_intersects)
+escuelas_con_barrios <- st_join(educ2, buffers_multi, join = st_intersects)
+
+```
+
+```{r}
+#Visualizacion
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
+  geom_sf(data = educ2, aes(color = tipo_gestion), size = 1.5) +
+  geom_sf(data = buffers_multi, aes(fill = distancia), alpha = 0.05) +
+  geom_sf(data = escuelas_con_barrios, aes(fill = tipo_gestion), alpha = 0.01) +
+  labs(title = "Escuelas por tipo de gestión dentro de los buffers",
+       fill = "Gestión escolar") +
+  theme_minimal()
+```
 
 
 ```{r Barrios Populares}
@@ -188,14 +203,9 @@ ggplot() +
 ```{r Carga de datos 2}
 
 
-comunas <- st_read(url_comunas)
-st_crs(comunas)
-sum(!st_is_valid(comunas))
-
-educ <- st_read(url_educativos)
-sum(!st_is_valid(educ))
 
 socioeco_caba <- read.csv(url_socioecocaba, fileEncoding = "latin1")
+
 
   
 ```
