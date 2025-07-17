@@ -1,3 +1,8 @@
+comunas <- st_read(url_comunas)
+st_crs(comunas)
+sum(!st_is_valid(comunas))
+
+
 barrios_selec <- barrios_selec %>%
   mutate(NOMBRE = coalesce(NOMBRE, "Villa_31"))
 centroides_bar <- st_centroid(barrios_selec)
