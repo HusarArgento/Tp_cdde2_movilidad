@@ -51,3 +51,19 @@ barrios_cmyaed3 <- barrios_cmyaed2 %>%
   left_join(educ %>% select(nam, geometry), by = c("escuela_cercana" = "nam")) %>%
   rename(geom_escuela = geometry.y) %>%
   st_as_sf(crs = st_crs(barrios_cmyaed2))
+
+
+
+barrios_selec <- barrios_selec %>%
+  mutate(NOMBRE = coalesce(NOMBRE, "Villa_31")) #esto para que renombre los NA como Villa 31 que es el primer string
+centroides_bar <- st_centroid(barrios_selec) #trazamos centroides en barrios para la posterior medicion de distancias
+distancias <- st_distance(centroides_bar, educ) #Medimos (las escuelas estan en geometria punto)
+cercanias <-  st_nearest_feature(centroides_bar, educ) #Vemos cuales son las mas cercanas, quedan en el vector
+centroides_bar2 <- centroides_bar %>% #el vector almacena numero y posicionamiento, lo cruzamos con centroides y
+  mutate(escuela_cercana = educ$nam[cercanias]) #...traemos los nombres de las escuelas más cercanas.
+
+centroides_bar3 <- centroides_bar2 %>% mutate(distancia_m = as.numeric (st_distance(geometry, educ[cercanias, ], by_element = TRUE)),
+                                              distancia_km = distancia_m / 1000)
+#da numeros con unidades, si no pongo  el as.numeric y segun claude y gpt eso dificulta para operaciones posteriores (preguntar a Pablo)
+
+#Ahora ya tenemos los colegios con las distancias mas cercanas!
