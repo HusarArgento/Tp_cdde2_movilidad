@@ -151,20 +151,56 @@ educ2 <- st_transform(educ, 5347) %>%
   select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
 
 barrios_educ <- st_join(buffers_multi, educ2, join = st_intersects)
-escuelas_con_barrios <- st_join(educ2, buffers_multi, join = st_intersects)
-
+educ2_sna <- educ2 %>% filter(!is.na(tipo_gestion))
+escuelas_con_barrios <- st_join(educ2_sna, buffers_multi, join = st_intersects)%>%
+  filter(!is.na(distancia))
 ```
 
 ```{r}
 #Visualizacion
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
-  geom_sf(data = educ2, aes(color = tipo_gestion), size = 1.5) +
-  geom_sf(data = buffers_multi, aes(fill = distancia), alpha = 0.05) +
+  geom_sf(data = barrios_educ, aes(fill = distancia), alpha = 0.05) +
   geom_sf(data = escuelas_con_barrios, aes(fill = tipo_gestion), alpha = 0.01) +
   labs(title = "Escuelas por tipo de gestión dentro de los buffers",
        fill = "Gestión escolar") +
   theme_minimal()
+```
+
+
+
+```{r}
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
+  geom_sf(data = barrios_educ, aes(color = distancia), alpha = 0.01, size = 1) +
+  geom_sf(data = escuelas_con_barrios, aes(fill = tipo_gestion), color = NA, alpha = 0.5) +
+  scale_fill_manual(values = c(
+    "Estatal" = "#7570b3", 
+    "Privada" = "#d95f02"
+  )) +
+  facet_wrap(~ distancia) +
+  theme_minimal()
+```
+
+```{r}
+p2 <- p1 +
+  geom_sf(data = barrios_educ, aes(color = distancia), alpha = 0.01, size = 1)
+print(p2)
+```
+
+
+
+
+```{r}
+
+conteo_escuelas2 <- barrios_educ %>%
+  group_by(barrios_nom, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
+  summarize(cantidad_escuelas = n(), .groups = "drop")
+```
+
+
+```{r}
+
 ```
 
 
