@@ -155,3 +155,31 @@ leaflet() %>%
               weight = 1,
               fillOpacity = 0.6,
               label = ~NOMBRE)
+
+
+ggplot(barrios_q) +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "black") +
+  geom_sf(aes(fill = cluster), color = "white", size = 0.1) +
+  geom_sf_text(data = comunas_caba, aes(label = barrios),
+               color = "black", size = 3, fontface = "bold")+
+  scale_fill_manual(
+    values = c(
+      "Clase baja" = "#f2dede",
+      "Clase media" = "#f9bfbf",
+      "Clase media alta" = "#f08080",
+      "Clase alta" = "#c0392b"
+    )
+  ) +
+  theme_minimal() +
+  labs(title = "Distribución de clases sociales por radiocensal en CABA",
+       fill = "Clase Social")
+
+pal <- colorFactor(palette = "Set1", domain = baires_q$cluster)
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(data = baires_q,
+              fillColor =  ~pal(cluster),
+              color = "darkred",
+              weight = 1,
+              fillOpacity = 0.6,
+              label = ~ Remuneracion_media)
