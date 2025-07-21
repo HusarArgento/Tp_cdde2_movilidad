@@ -146,9 +146,9 @@ ggplot() +
   theme_minimal()
 ```
 ```{r}
-#Hacemos los buffers respecto de cada radio censal elegido
+#Trabajamos con anillos concentricos en vez de buffers
 
-# Hacemis  buffers individuales, necesarios para esta operacion
+# Hacemos  buffers individuales, necesarios para esta operacion
 buffer_500 <- barrios_fil %>% st_buffer(dist = 500)
 buffer_1000 <- barrios_fil %>% st_buffer(dist = 1000)
 buffer_2000 <- barrios_fil %>% st_buffer(dist = 2000)
@@ -186,8 +186,8 @@ rm(educ)
 #Visualizacion
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
-  geom_sf(data = barrios_educ, aes(fill = distancia), alpha = 0.05) +
-  geom_sf(data = educ_barrios, aes(fill = tipo_gestion), alpha = 0.01) +
+  geom_sf(data = barrios_educ, aes(fill = distancia), alpha = 0.02) +
+  geom_sf(data = educ_barrios, aes(fill = tipo_gestion), alpha = 0.5) +
   labs(title = "Escuelas por tipo de gestión dentro de los buffers",
        fill = "Gestión escolar") +
   theme_minimal()
@@ -195,18 +195,6 @@ ggplot() +
 
 
 
-```{r}
-ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
-  geom_sf(data = barrios_educ, aes(color = distancia), alpha = 0.01, size = 1) +
-  geom_sf(data = escuelas_con_barrios, aes(fill = tipo_gestion), color = NA, alpha = 0.5) +
-  scale_fill_manual(values = c(
-    "Estatal" = "#7570b3", 
-    "Privada" = "#d95f02"
-  )) +
-  facet_wrap(~ distancia) +
-  theme_minimal()
-```
 
 ```{r}
 p1 <- ggplot() +
@@ -218,7 +206,8 @@ print(p2)
 
 ```{r}
 ggplot() +
-  geom_sf(data = barrios_buffers, aes(fill = distancia), color = "grey50", alpha = 0.3) +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", alpha = 0.3, size = 0.1)+
+  geom_sf(data = barrios_educ, aes(fill = distancia), color = "violet", alpha = 0.3) +
   geom_sf(data = educ_barrios, color = "blue", size = 1) +
   labs(
     title = "Escuelas dentro de radios de barrios de clase media y alta",
@@ -284,10 +273,11 @@ td <- tempdir()
   unzip(zipfile = fs::path(td, "barrios-populares-badata.zip"),
         exdir = td)
   barrios_vul <- read_sf(fs::path(td, "barrios_vulnerables.shp"))
-  rm(td)
+  rm(td)  
 st_crs(barrios_vul)
 sum(!st_is_valid(barrios_vul))
 barrios_vul <- st_transform(barrios_vul, 5347)
+   
 
 ```
 #Barrios populares 
@@ -324,15 +314,18 @@ Este conjunto de datos proporciona información sobre la ubicación, perímetro 
 barrios_vul_rs <- st_join(barrios_vul, radio_bsas, join = st_intersects) 
 
 
-barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
+barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31","Villa 31 - Padre Mugica", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
   mutate(NOMBRE = case_when(
     NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
     NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
     NOMBRE == "Villa 21-24" ~ "Villa_21-24"
-  )) #Renombramos para que sea mas facil manejar el dato
+  ))  %>%
+  rename(barrios_nom = NOMBRE)
+ #Renombramos para que sea mas facil manejar el dato
 
 barrios_vul_selec <- barrios_vul_selec %>%
-  mutate(NOMBRE = coalesce(NOMBRE, "Villa_31")) #esto para que renombre los NA como Villa 31 que es el primer string
+  mutate(barrios_nom = coalesce(barrios_nom, "Villa_31")) #esto para que renombre los NA como Villa 31 que es el primer string
 rm(barrios_vul)
 rm(barrios_vul_rs)
 
@@ -343,22 +336,29 @@ rm(barrios_vul_rs)
 
 ```{r}
 #Hacemos los buffers
-buffers_500  <- barrios_vul_selec %>% st_buffer(500)  %>% mutate(distancia = "500m")
-buffers_1000 <- barrios_vul_selec %>% st_buffer(1000) %>% mutate(distancia = "1000m")
-buffers_2000 <- barrios_vul_selec %>% st_buffer(2000) %>% mutate(distancia = "2000m")
+buffer_vul_500  <- barrios_vul_selec %>% st_buffer(500)  %>% mutate(distancia = "500m")
+buffer_vul_1000 <- barrios_vul_selec %>% st_buffer(1000) %>% mutate(distancia = "1000m")
+buffer_vul_2000 <- barrios_vul_selec %>% st_buffer(2000) %>% mutate(distancia = "2000m")
 
-#Juntamos en tabla
-buffers_barrios_vul <- bind_rows(buffers_500, buffers_1000, buffers_2000)
-rm(buffers_500)
-rm(buffers_1000)
-rm(buffers_2000)
+# Anillos concéntricos para barrios vulnerables
+buffers_barrios_vul <- bind_rows(
+  buffer_vul_500 %>% mutate(distancia = "0-500m"),
+  st_difference(buffer_vul_1000, buffer_vul_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(buffer_vul_2000, buffer_vul_1000) %>% mutate(distancia = "1000-2000m")
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+rm(buffer_vul_500)
+rm(buffer_vul_1000)
+rm(buffer_vul_2000)
 ```
 
 
 ```{r}
 #Joins
 
-barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects) #Unimos por interseccion los buffers con las escuelas para ver cuantas entran en cada radio
+barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)%>%
+  filter(!is.na(distancia)) #Unimos por interseccion los buffers con las escuelas para ver cuantas entran en cada radio
 
 educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)%>%
   filter(!is.na(distancia)) #para sacar escuelas que no pertenezcan a ningun buffer (mas adelante para grafico=
@@ -369,7 +369,7 @@ educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)
 ggplot(educ_barrios_vul) +
   geom_sf(data = radio_bsas, fill = "grey95", color = "white") +
   geom_sf(aes(color = distancia), size = 1) +
-  facet_wrap(~NOMBRE) +
+  facet_wrap(distancia~NOMBRE) +
   theme_minimal() +
   labs(title = "Escuelas dentro de buffers de barrios populares")
 ```
@@ -381,8 +381,33 @@ conteo_esc_bpop <- barrios_vul_educ %>%
   group_by(NOMBRE, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
   summarize(cantidad_escuelas = n(), .groups = "drop") %>%
   arrange(NOMBRE, distancia)
+
+
 ```
 
+```{r}
+ggplot(conteo_esc_bpop, aes(x = NOMBRE, y = cantidad_escuelas, fill = distancia)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Cantidad de escuelas cercanas por barrio vulnerable y distancia",
+    x = "Barrio",
+    y = "Cantidad de escuelas",
+    fill = "Distancia del barrio"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 
+```{r}
+ggplot()+
+  geom_col(data = conteo_esc_bpop, aes(x = distancia, y = cantidad_escuelas, fill = distancia)) +
+  facet_wrap(~NOMBRE) +
+  labs(
+    title = "Escuelas dentro del radio de cada barrio",
+    x = "Distancia",
+    y = "Cantidad de escuelas"
+  ) +
+  theme_minimal()
+```
 
 
