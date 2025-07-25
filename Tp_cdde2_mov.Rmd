@@ -16,7 +16,8 @@ library(sf)
 library(nngeo)
 library(leaflet)
 library(fs)
-
+library(osmdata)
+library(osrm)
 ```
 
 
@@ -137,6 +138,9 @@ st_crs(radio_bsas)
 sum(!st_is_valid(radio_bsas))
 radio_bsas <- st_transform(radio_bsas, 5347)
 ```
+
+
+
 ```{r}
 #Primera visualizacion: Distribucion socio economica de caba  
 ggplot() + 
@@ -174,12 +178,15 @@ educ <- st_transform(educ, 5347) %>%
 educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
 rm(educ)
 
-  #Hacemos los joins
+  
+```
+
+```{r}
+#Hacemos los joins
   barrios_educ <- st_join(barrios_buffers, educ_sna, join = st_intersects)
   educ_barrios <- st_join(educ_sna, barrios_buffers, join = st_intersects)%>%
     filter(!is.na(distancia)) 
 ```
-
 
 
 ```{r}
@@ -360,10 +367,20 @@ rm(buffer_vul_2000)
 barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)%>%
   filter(!is.na(distancia)) #Unimos por interseccion los buffers con las escuelas para ver cuantas entran en cada radio
 
-educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)%>%
-  filter(!is.na(distancia)) #para sacar escuelas que no pertenezcan a ningun buffer (mas adelante para grafico=
 
 ```
+
+```{r}
+educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)%>%
+  filter(!is.na(distancia)) #para sacar escuelas que no pertenezcan a ningun buffer (mas adelante para grafico=
+educ_puntos <- educ_barrios_vul %>%
+  st_cast("POINT")
+st_geometry_type(educ_puntos) %>% unique()
+
+```
+
+
+
 
 ```{r}
 ggplot(educ_barrios_vul) +
@@ -410,4 +427,84 @@ ggplot()+
   theme_minimal()
 ```
 
+```{r}
+#Geoconsultas OSM
+
+geo_baires <- opq(bbox = "Ciudad Autónoma de Buenos Aires") %>%
+  add_osm_feature(key = "highway", value = "footway")
+available_features()
+
+
+distancias_osrm <- osrmTable(
+  src = barrios_vul_selec,           # tus barrios vulnerables ( polígonos)
+  dst = educ_barrios_vul,       # solo las escuelas cercanas por buffer
+  osrm.profile = "foot"          # caminando
+)
+
+#El problema es que el source (src) debe ser punto. Entonces transformamos puntos. Al ser radiocensal la perdida de precisión es mínima.
+
+barrios_puntos <- barrios_vul_selec %>%
+  st_point_on_surface()
+
+distancias_osrm <- osrmTable(
+  src = barrios_puntos,           # tus barrios vulnerables ( polígonos)
+  dst = proximidad,       # solo las escuelas cercanas por buffer
+  osrm.profile = "foot"          # caminando
+)
+
+barrios_puntos <- barrios_vul_selec %>% 
+  st_cast("POINT")
+st_geometry_type(barrios_puntos) %>% unique()
+
+barrios_puntos$id <- paste0("barrio_", seq_len(nrow(barrios_puntos)))
+educ_barrios_vul$id <- paste0("escuela_", seq_len(nrow(educ_barrios_vul)))
+
+unique(st_geometry_type(barrios_puntos))        # Debería devolver "POINT"
+unique(st_geometry_type(educ_barrios_vul))      # También "POINT"
+
+```
+
+
+
+```{r}
+barrios_test <- barrios_puntos[1:3, ]
+escuelas_test <- educ_barrios_vul[1:10, ]
+
+distancias_test <- osrmTable(
+  src = barrios_test,
+  dst = escuelas_test,
+  osrm.profile = "foot"
+)
+
+
+```
+
+```{r}
+proximidad <- st_join(barrios_puntos, educ_barrios_vul, join = st_nearest_feature)
+
+```
+
+```{r}
+library(osrm)
+
+# Usa el servidor público de OSRM - GRATIS
+tiempo_caminando <- osrmTable(
+  src = barrios_puntos,
+  dst = educ_puntos,
+  osrm.profile = "foot",
+  osrm.server = "https://router.project-osrm.org/"  # servidor público
+)
+
+```
+```{r}
+# Test con solo 2 barrios y 2 escuelas
+test_barrios <- barrios_puntos[1:2,]
+test_escuelas <- educ_puntos[1:2,]
+
+tiempo_test <- osrmTable(
+  src = test_barrios,
+  dst = test_escuelas,
+  osrm.profile = "foot"
+)
+```
 
