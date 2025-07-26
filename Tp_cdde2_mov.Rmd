@@ -18,6 +18,7 @@ library(leaflet)
 library(fs)
 library(osmdata)
 library(osrm)
+library(openrouteservice)
 ```
 
 
@@ -94,7 +95,7 @@ baires_q <- baires_ecorad %>% mutate(cluster = case_when(
 
 
 ```{r}
-#Carganis el mapa de barrios y le transformamos el crs
+#Cargamos el mapa de barrios y le transformamos el crs
 barrios_caba <- st_read(url_barrioscaba)
 st_crs(barrios_caba)
 sum(!st_is_valid(barrios_caba))
@@ -318,7 +319,7 @@ Este conjunto de datos proporciona información sobre la ubicación, perímetro 
 ```{r Operaciones}
 #Hacemos el space join entre los barrios y los radiocensales, para unir solo las partes de la geometria, es decir los radiocensales, que se intersectan con los barrios populares
 
-barrios_vul_rs <- st_join(barrios_vul, radio_bsas, join = st_intersects) 
+barrios_vul_rs <- st_join(barrios_vul, radios2, join = st_intersects) 
 
 
 barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31","Villa 31 - Padre Mugica", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
@@ -362,17 +363,16 @@ rm(buffer_vul_2000)
 
 
 ```{r}
-#Joins
+#Joins: Unimos por interseccion los buffers con las escuelas para ver cuantas entran en cada radio
 
-barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)%>%
-  filter(!is.na(distancia)) #Unimos por interseccion los buffers con las escuelas para ver cuantas entran en cada radio
-
-
+barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)
+filter(!is.na(distancia))
 ```
 
 ```{r}
 educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)%>%
-  filter(!is.na(distancia)) #para sacar escuelas que no pertenezcan a ningun buffer (mas adelante para grafico=
+  filter(!is.na(distancia)) 
+#para sacar escuelas que no pertenezcan a ningun buffer (mas adelante para grafico=
 educ_puntos <- educ_barrios_vul %>%
   st_cast("POINT")
 st_geometry_type(educ_puntos) %>% unique()
@@ -506,5 +506,276 @@ tiempo_test <- osrmTable(
   dst = test_escuelas,
   osrm.profile = "foot"
 )
+```
+
+
+```{r}
+  ors_api_key("eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkNDUzYTY5M2FjMDRjN2E4YmQyNDI3YjFiMzE0MGEwIiwiaCI6Im11cm11cjY0In0=rm")
+
+# Calcular matriz de tiempos
+matriz_tiempos <- ors_matrix(
+  locations = rbind(st_coordinates(barrios_puntos), 
+                   st_coordinates(educ_puntos)),
+  profile = "foot-walking",
+  metrics = c("duration", "distance")
+)
+```
+```{r}
+# Calcular solo la escuela más cercana por barrio
+calcular_cercana_ors <- function(barrio_coords, escuelas_coords) {
+  
+  # Combinar: 1 barrio + todas las escuelas
+  coords <- rbind(barrio_coords, escuelas_coords)
+  
+  if(nrow(coords) > 50) {
+    # Si hay más de 50 escuelas, tomar muestra
+    muestra_escuelas <- sample(nrow(escuelas_coords), min(49, nrow(escuelas_coords)))
+    coords <- rbind(barrio_coords, escuelas_coords[muestra_escuelas,])
+  }
+  
+  matriz <- ors_matrix(
+    locations = coords,
+    profile = "foot-walking",
+    metrics = "duration"
+  )
+  
+  # Primera fila = distancias desde el barrio
+  tiempos <- matriz$durations[1, -1]
+  return(min(tiempos, na.rm = TRUE))
+}
+
+# Aplicar a cada barrio individualmente
+barrios_puntos$tiempo_escuela_cercana <- map_dbl(1:nrow(barrios_puntos), function(i) {
+  cat("Barrio", i, "\n")
+  tiempo <- calcular_cercana_ors(
+    st_coordinates(barrios_puntos[i,]), 
+    st_coordinates(educ_puntos)
+  )
+  Sys.sleep(2)
+  return(tiempo)
+})
+```
+```{r}
+ors_api_key()
+ors_api_key("eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkNDUzYTY5M2FjMDRjN2E4YmQyNDI3YjFiMzE0MGEwIiwiaCI6Im11cm11cjY0In0=")
+```
+
+```{r}
+library(openrouteservice)
+
+# Configurar tu API key
+ors_api_key("TU_API_KEY_AQUI")
+
+# IMPORTANTE: Usar ors_matrix (no otras funciones)
+# Matrix V2 permite máximo 50x50 ubicaciones por request
+
+# Test con pocos datos primero
+test_barrios <- barrios_puntos[1:2,]
+test_escuelas <- educ_puntos[1:5,]
+
+# Combinar coordenadas (barrios primero, luego escuelas)
+coords_combinadas <- rbind(
+  st_coordinates(test_barrios),
+  st_coordinates(test_escuelas)
+)
+
+# Test básico
+test_matriz <- ors_matrix(
+  locations = coords_combinadas,
+  profile = "foot-walking",
+  metrics = c("duration"),
+  units = "m"
+)
+
+print(test_matriz)
+```
+```{r}
+library(httr)
+
+# Test directo a la API
+tu_api_key <- "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkNDUzYTY5M2FjMDRjN2E4YmQyNDI3YjFiMzE0MGEwIiwiaCI6Im11cm11cjY0In0="
+
+response <- GET(
+  url = "https://api.openrouteservice.org/v2/matrix/foot-walking",
+  add_headers(Authorization = paste("Bearer", tu_api_key)),
+  body = list(
+    locations = list(
+      c(-58.3816, -34.6037),
+      c(-58.3700, -34.6100)
+    )
+  ),
+  encode = "json"
+)
+
+print(response$status_code)
+print(content(response, "text"))
+```
+
+```{r}
+library(httr)
+library(jsonlite)
+
+# Test correcto con POST
+tu_api_key <- "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkNDUzYTY5M2FjMDRjN2E4YmQyNDI3YjFiMzE0MGEwIiwiaCI6Im11cm11cjY0In0="
+
+response <- POST(
+  url = "https://api.openrouteservice.org/v2/matrix/foot-walking",
+  add_headers(
+    Authorization = paste("Bearer", tu_api_key),
+    `Content-Type` = "application/json"
+  ),
+  body = toJSON(list(
+    locations = list(
+      c(-58.3816, -34.6037),
+      c(-58.3700, -34.6100)
+    )
+  ), auto_unbox = TRUE),
+  encode = "raw"
+)
+
+print(response$status_code)
+print(content(response, "text"))
+```
+```{r}
+library(openrouteservice)
+
+# Tu API key está bien, configurarla
+ors_api_key("eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkNDUzYTY5M2FjMDRjN2E4YmQyNDI3YjFiMzE0MGEwIiwiaCI6Im11cm11cjY0In0=")
+
+# Test exactamente igual que el manual
+test_coords <- matrix(c(-58.3816, -34.6037,
+                       -58.3700, -34.6100),
+                     nrow = 2, byrow = TRUE)
+
+# Esto debería funcionar ahora
+test_matriz <- ors_matrix(
+  locations = test_coords,
+  profile = "foot-walking",
+  metrics = "duration"
+)
+
+print(test_matriz)
+```
+
+```{r}
+# Primero verificar el sistema de coordenadas actual
+print("CRS actual barrios:")
+st_crs(barrios_puntos)
+
+print("CRS actual escuelas:")
+st_crs(educ_puntos)
+
+# Convertir a coordenadas geográficas WGS84
+barrios_wgs84 <- st_transform(barrios_puntos, crs = 4326)
+escuelas_wgs84 <- st_transform(educ_puntos, crs = 4326)
+
+# Verificar las coordenadas convertidas
+print("Coordenadas barrio convertidas (lon, lat):")
+print(st_coordinates(barrios_wgs84[1,]))
+
+print("Coordenadas escuelas convertidas (lon, lat):")
+print(st_coordinates(escuelas_wgs84[1:3,]))
+
+
+
+
+```
+```{r}
+# Test con coordenadas en WGS84
+test_barrios_wgs84 <- barrios_wgs84[1:1,]
+test_escuelas_wgs84 <- escuelas_wgs84[1:3,]
+
+# Combinar coordenadas (ahora deberían estar en formato lon/lat)
+coords_wgs84 <- rbind(
+  st_coordinates(test_barrios_wgs84),
+  st_coordinates(test_escuelas_wgs84)
+)
+
+print("Coordenadas en WGS84 (deberían ser ~-58, -34):")
+print(coords_wgs84)
+
+# Test con OpenRouteService
+matriz_wgs84 <- ors_matrix(
+  locations = coords_wgs84,
+  profile = "foot-walking",
+  metrics = "duration"
+)
+
+print("¡Funciona! Matriz de tiempos:")
+print(matriz_wgs84$durations)
+
+# Tiempos a escuelas
+tiempos_escuelas <- matriz_wgs84$durations[1, -1]
+print(paste("Tiempos a escuelas:", paste(round(tiempos_escuelas/60, 1), collapse = ", "), "minutos"))
+```
+```{r}
+# Función para procesar todos los barrios
+calcular_accesibilidad_completa <- function(barrios_wgs84, escuelas_wgs84, max_escuelas = 20) {
+  
+  n_barrios <- nrow(barrios_wgs84)
+  
+  resultados <- data.frame(
+    barrio_id = 1:n_barrios,
+    tiempo_escuela_cercana_min = NA,
+    tiempo_escuela_cercana_seg = NA,
+    num_escuelas_evaluadas = NA
+  )
+  
+  for(i in 1:n_barrios) {
+    
+    cat("Procesando barrio", i, "de", n_barrios, "\n")
+    
+    tryCatch({
+      
+      # Tomar hasta 20 escuelas para no exceder límites
+      n_escuelas <- min(max_escuelas, nrow(escuelas_wgs84))
+      
+      # Combinar coordenadas: 1 barrio + N escuelas
+      coords <- rbind(
+        st_coordinates(barrios_wgs84[i,]),
+        st_coordinates(escuelas_wgs84[1:n_escuelas,])
+      )
+      
+      # Calcular matriz
+      matriz <- ors_matrix(
+        locations = coords,
+        profile = "foot-walking",
+        metrics = "duration"
+      )
+      
+      # Extraer tiempos a escuelas (fila 1, columnas 2 en adelante)
+      tiempos <- matriz$durations[1, -1]
+      
+      # Encontrar el mínimo
+      tiempo_min_seg <- min(tiempos, na.rm = TRUE)
+      tiempo_min_min <- tiempo_min_seg / 60
+      
+      # Guardar resultados
+      resultados$tiempo_escuela_cercana_seg[i] <- tiempo_min_seg
+      resultados$tiempo_escuela_cercana_min[i] <- tiempo_min_min
+      resultados$num_escuelas_evaluadas[i] <- n_escuelas
+      
+      # Pausa para respetar rate limits (40 per minute = 1.5 seg)
+      Sys.sleep(2)
+      
+    }, error = function(e) {
+      cat("Error en barrio", i, ":", e$message, "\n")
+    })
+  }
+  
+  return(resultados)
+}
+
+# Ejecutar análisis completo
+accesibilidad_final <- calcular_accesibilidad_completa(barrios_wgs84, escuelas_wgs84)
+
+# Ver resultados
+head(accesibilidad_final)
+summary(accesibilidad_final$tiempo_escuela_cercana_min)
+
+# Estadísticas básicas
+cat("Tiempo promedio a escuela más cercana:", 
+    round(mean(accesibilidad_final$tiempo_escuela_cercana_min, na.rm = TRUE), 1), 
+    "minutos\n")
 ```
 
