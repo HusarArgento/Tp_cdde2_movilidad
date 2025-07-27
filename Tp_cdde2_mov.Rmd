@@ -212,15 +212,15 @@ ggplot() +
 p1 <- ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1)
 p2 <- p1 +
-  geom_sf(data = barrios_educ, aes(color = distancia), alpha = 0.01, size = 1)
+  geom_sf(data = barrioscm_educ, aes(color = distancia), alpha = 0.01, size = 1)
 print(p2)
 ```
 
 ```{r}
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", alpha = 0.3, size = 0.1)+
-  geom_sf(data = barrios_educ, aes(fill = distancia), color = "violet", alpha = 0.3) +
-  geom_sf(data = educ_barrios, color = "blue", size = 1) +
+  geom_sf(data = barrioscm_educ, aes(fill = distancia), color = "violet", alpha = 0.3) +
+  geom_sf(data = educ_barrioscm, color = "blue", size = 1) +
   labs(
     title = "Escuelas dentro de radios de barrios de clase media y alta",
     fill = "Radio del buffer"
