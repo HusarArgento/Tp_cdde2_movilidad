@@ -51,7 +51,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 td <- tempdir()
 rar_path <- path(td, "Shapes.rar")
 download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
-system(paste('"D:/PROGRAMS-HDD/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+system(paste('"C:/Program Files/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
 list.files(td, pattern = "\\.shp$", recursive = TRUE)
 radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
 list.files(td, recursive = TRUE)
@@ -73,18 +73,15 @@ radio_socioeco <- read.csv(url_radiosocioeco, fileEncoding = "latin1")
 mapa_eco <- left_join(radios2, radio_socioeco, by = c("CO_FRAC_RA" = "LINK" ) ) %>%
   filter(!is.na(Remuneracion_media)) 
 rm(radio_socioeco)
-
 ```
 
 
-
 ```{r}
-
 #Ordenamos y clasificamos los clusters
 
 baires_ecorad <- mapa_eco  %>% filter(provincia_id == 2, Remuneracion_media > 30000 ) #Filtrado de CABA
  
-baires_q <- baires_ecorad %>% mutate(cluster = case_when( 
+bairescm_q <- baires_ecorad %>% mutate(cluster = case_when( 
   Remuneracion_media <= quantile(Remuneracion_media, 0.25, na.rm = TRUE) ~ "Clase baja",
   Remuneracion_media <= quantile(Remuneracion_media, 0.50, na.rm = TRUE) ~ "Clase media",  
   Remuneracion_media <= quantile(Remuneracion_media, 0.75, na.rm = TRUE) ~ "Clase media alta", 
@@ -96,19 +93,19 @@ baires_q <- baires_ecorad %>% mutate(cluster = case_when(
 
 ```{r}
 #Cargamos el mapa de barrios y le transformamos el crs
-barrios_caba <- st_read(url_barrioscaba)
-st_crs(barrios_caba)
-sum(!st_is_valid(barrios_caba))
-barrios_caba <- st_transform(barrios_caba, 5347)
+barrioscm_caba <- st_read(url_barrioscaba)
+st_crs(barrioscm_caba)
+sum(!st_is_valid(barrioscm_caba))
+barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
 #Join espacial para ubicar radio censales en barrios
-barrios_sj <- st_join(baires_q, barrios_caba, join = st_intersects)
+barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
 
 #Seleccionamos columnas que nos interesan y renombramos
-barrios_sjs <- barrios_sj %>% 
+barrioscm_sjs <- barrios_cm_sj %>% 
   select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
   rename(barrios_nom = nombre)
-rm(barrios_sj)
+rm(barrios_cm_sj)
 ```
 
 
@@ -116,7 +113,7 @@ rm(barrios_sj)
 
 ```{r}
 #Agrupamos por barrios y filtramos los que nos interesan 
-barrios_fil <- barrios_sjs %>%
+barrioscm_fil <- barrioscm_sjs %>%
   filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
            barrios_nom == "Caballito" & cluster == "Clase media alta"|
            barrios_nom == "Almagro" & cluster == "Clase media" ) %>%
@@ -124,7 +121,7 @@ barrios_fil <- barrios_sjs %>%
   arrange(desc (Remuneracion_media)) %>%
   slice_head(n=8) %>%
   ungroup()
-rm(barrios_sjs)
+rm(barrioscm_sjs)
 
 ```
 
@@ -146,20 +143,27 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 #Primera visualizacion: Distribucion socio economica de caba  
 ggplot() + 
   geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
-  geom_sf(data = barrios_fil, aes(fill = barrios_nom), color = "white", size = 0.2) +
+  geom_sf(data = barrioscm_fil, aes(fill = barrios_nom), color = "white", size = 0.2) +
   scale_fill_brewer(palette = "Set1") +
   theme_minimal()
 ```
+
+
+
+
+
+
+
 ```{r}
 #Trabajamos con anillos concentricos en vez de buffers
 
 # Hacemos  buffers individuales, necesarios para esta operacion
-buffer_500 <- barrios_fil %>% st_buffer(dist = 500)
-buffer_1000 <- barrios_fil %>% st_buffer(dist = 1000)
-buffer_2000 <- barrios_fil %>% st_buffer(dist = 2000)
+buffer_500 <- barrioscm_fil %>% st_buffer(dist = 500)
+buffer_1000 <- barrioscm_fil %>% st_buffer(dist = 1000)
+buffer_2000 <- barrioscm_fil %>% st_buffer(dist = 2000)
 
 # Crear los anillos concéntricos
-barrios_anillos <- bind_rows(
+barrioscm_anillos <- bind_rows(
   buffer_500 %>% mutate(distancia = "0-500m"),                              # Anillo interior completo
   st_difference(buffer_1000, buffer_500) %>% mutate(distancia = "500-1000m"),  # Solo la corona entre 500-1000m
   st_difference(buffer_2000, buffer_1000) %>% mutate(distancia = "1000-2000m")  # Solo la corona entre 1000-2000m
@@ -184,8 +188,8 @@ rm(educ)
 
 ```{r}
 #Hacemos los joins
-  barrios_educ <- st_join(barrios_buffers, educ_sna, join = st_intersects)
-  educ_barrios <- st_join(educ_sna, barrios_buffers, join = st_intersects)%>%
+  barrioscm_educ <- st_join(barrioscm_anillos, educ_sna, join = st_intersects)
+  educ_barrioscm <- st_join(educ_sna, barrioscm_anillos, join = st_intersects)%>%
     filter(!is.na(distancia)) 
 ```
 
@@ -194,8 +198,8 @@ rm(educ)
 #Visualizacion
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
-  geom_sf(data = barrios_educ, aes(fill = distancia), alpha = 0.02) +
-  geom_sf(data = educ_barrios, aes(fill = tipo_gestion), alpha = 0.5) +
+  geom_sf(data = barrioscm_educ, aes(fill = distancia), alpha = 0.02) +
+  geom_sf(data = educ_barrioscm, aes(fill = tipo_gestion), alpha = 0.5) +
   labs(title = "Escuelas por tipo de gestión dentro de los buffers",
        fill = "Gestión escolar") +
   theme_minimal()
