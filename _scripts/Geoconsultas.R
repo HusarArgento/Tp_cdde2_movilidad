@@ -254,3 +254,56 @@ puntos_con_escuela <- rowSums(intersecciones) > 0
 
 # Ver cuántos puntos tienen al menos una escuela cerca
 sum(puntos_con_escuela)
+
+
+# 3. Ejecutar la matriz de tiempos
+tabla_tiempos <- osrmTable(
+  src = radios_vul8,
+  dst = escuelasvul_500
+)
+
+# 4. Convertir matriz a formato largo para análisis
+df_tiempos <- as.data.frame(tabla_tiempos$durations)
+df_tiempos$radio_id <- rownames(df_tiempos)
+
+df_tiempos_largo <- df_tiempos %>%
+  pivot_longer(
+    cols = -radio_id,
+    names_to = "escuela_id",
+    values_to = "tiempo_min"
+  )
+
+# 3. Ejecutar la matriz de tiempos
+tabla_tiempos2 <- osrmTable(
+  src = radios_vul8,
+  dst = escuelasvul_1000
+)
+
+# 4. Convertir matriz a formato largo para análisis
+df_tiempos2 <- as.data.frame(tabla_tiempos$durations)
+df_tiempos2$radio_id <- rownames(df_tiempos)
+
+df_tiempos_largo2 <- df_tiempos2 %>%
+  pivot_longer(
+    cols = -radio_id,
+    names_to = "escuela_id",
+    values_to = "tiempo_min"
+  )
+
+
+# 3. Ejecutar la matriz de tiempos
+tabla_tiempos3 <- osrmTable(
+  src = radios_vul8,
+  dst = escuelas_2000
+)
+
+# 4. Convertir matriz a formato largo para análisis
+df_tiempos3 <- as.data.frame(tabla_tiempos$durations)
+df_tiempos3$radio_id <- rownames(df_tiempos)
+
+df_tiempos_largo3 <- df_tiempos3 %>%
+  pivot_longer(
+    cols = -radio_id,
+    names_to = "escuela_id",
+    values_to = "tiempo_min"
+  )

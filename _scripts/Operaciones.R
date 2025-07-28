@@ -123,3 +123,63 @@ radios_palermo_alta <- radios_df %>%
   #  left_join(educ %>% select(nam, geometry), by = c("escuela_cercana" = "nam")) %>%
   #  rename(geom_escuela = geometry.y) %>%
   #  st_as_sf(crs = st_crs(barrios_cmyaed2))
+
+
+  proximidad <- st_join(barrios_puntos, educ_barrios_vul, join = st_nearest_feature)
+
+  #buffers
+  barrios_vul_puntos <- barrios_vul_selec %>%
+    st_point_on_surface() %>%
+    select(Id, barrios_nom, CO_FRAC_RA, TIPO_ASENT,MANZANA, Superficie, geometry)  # Ajustá según tus columnas
+
+  radios_vul8 <- barrios_vul_puntos %>%
+    group_by(barrios_nom) %>%
+    arrange(desc(Superficie)) %>%
+    slice_head(n = 8) %>%
+    ungroup()
+  buff_vul_500 <- st_buffer(radios_vul8, dist = 500)
+  buff_vul_1000 <- st_buffer(radios_vul8, dist = 1000)
+  buff_vul_2000 <- st_buffer(radios_vul8, dist = 2000)
+
+  escuelasvul_500 <- st_filter(educ_sna, buff_vul_500)
+  escuelasvul_1000 <- st_filter(educ_sna, buff_vul_1000)
+  escuelasvul_2000 <- st_filter(educ_sna, buff_vul_2000)
+
+
+
+
+  #Hacemos los buffers
+  buffer_vul_500  <- barrios_vul_selec %>% st_buffer(500)  %>% mutate(distancia = "500m")
+  buffer_vul_1000 <- barrios_vul_selec %>% st_buffer(1000) %>% mutate(distancia = "1000m")
+  buffer_vul_2000 <- barrios_vul_selec %>% st_buffer(2000) %>% mutate(distancia = "2000m")
+
+  # Anillos concéntricos para barrios vulnerables
+  buffers_barrios_vul <- bind_rows(
+    buffer_vul_500 %>% mutate(distancia = "0-500m"),
+    st_difference(buffer_vul_1000, buffer_vul_500) %>% mutate(distancia = "500-1000m"),
+    st_difference(buffer_vul_2000, buffer_vul_1000) %>% mutate(distancia = "1000-2000m")
+  ) %>%
+    mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+  barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)
+  filter(!is.na(distancia))
+  educ_puntos <- educ_barrios_vul %>%
+    st_cast("POINT")
+  st_geometry_type(educ_puntos) %>% unique()
+
+
+
+
+  educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)%>%
+    filter(!is.na(distancia))
+  #Joins: Unimos por interseccion los buffers con las escuelas para ver cuantas entran en cada radio
+
+  barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)
+  filter(!is.na(distancia))
+
+  educ_barrios_vul <- st_join(educ_sna, buffers_barrios_vul, join = st_intersects)%>%
+    filter(!is.na(distancia))
+
+  #para sacar escuelas que no pertenezcan a ningun buffer (mas adelante para grafico=
+  educ_puntos <- educ_barrios_vul %>%
+    st_cast("POINT")
+  st_geometry_type(educ_puntos) %>% unique()
