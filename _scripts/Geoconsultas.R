@@ -200,3 +200,57 @@ summary(accesibilidad_final$tiempo_escuela_cercana_min)
 cat("Tiempo promedio a escuela más cercana:",
     round(mean(accesibilidad_final$tiempo_escuela_cercana_min, na.rm = TRUE), 1),
     "minutos\n")
+
+
+#Geoconsultas OSM
+
+geo_baires <- opq(bbox = "Ciudad Autónoma de Buenos Aires") %>%
+  add_osm_feature(key = "highway", value = "footway")
+available_features()
+
+
+distancias_osrm <- osrmTable(
+  src = barrios_vul_selec,           # tus barrios vulnerables ( polígonos)
+  dst = educ_barrios_vul,       # solo las escuelas cercanas por buffer
+  osrm.profile = "foot"          # caminando
+)
+
+#El problema es que el source (src) debe ser punto. Entonces transformamos puntos. Al ser radiocensal la perdida de precisión es mínima.
+
+barrios_puntos <- barrios_vul_selec %>%
+  st_point_on_surface()
+
+distancias_osrm <- osrmTable(
+  src = barrios_puntos,           # tus barrios vulnerables ( polígonos)
+  dst = proximidad,       # solo las escuelas cercanas por buffer
+  osrm.profile = "foot"          # caminando
+)
+
+barrios_puntos <- barrios_vul_selec %>%
+  st_cast("POINT")
+st_geometry_type(barrios_puntos) %>% unique()
+
+barrios_puntos$id <- paste0("barrio_", seq_len(nrow(barrios_puntos)))
+educ_barrios_vul$id <- paste0("escuela_", seq_len(nrow(educ_barrios_vul)))
+
+unique(st_geometry_type(barrios_puntos))        # Debería devolver "POINT"
+unique(st_geometry_type(educ_barrios_vul))      # También "POINT"
+.
+
+
+
+
+# Supongamos que barrios_vul_puntos está en CRS métrico, si no, transformalo:
+
+# Crear buffers de 500 metros
+circulo_500 <- st_buffer(barrios_vul_puntos, dist = 500)
+escuelas_en_buffer <- educ_sna[st_intersects(educ_sna, st_union(circulo_500), sparse = FALSE), ]
+
+# Identificar qué buffers tienen escuelas
+intersecciones <- st_intersects(circulo_500, educ_sna, sparse = FALSE)
+
+# Sumar filas (cada fila es un buffer/punto)
+puntos_con_escuela <- rowSums(intersecciones) > 0
+
+# Ver cuántos puntos tienen al menos una escuela cerca
+sum(puntos_con_escuela)

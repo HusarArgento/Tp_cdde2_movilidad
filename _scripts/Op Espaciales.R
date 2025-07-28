@@ -67,3 +67,30 @@ centroides_bar3 <- centroides_bar2 %>% mutate(distancia_m = as.numeric (st_dista
 #da numeros con unidades, si no pongo  el as.numeric y segun claude y gpt eso dificulta para operaciones posteriores (preguntar a Pablo)
 
 #Ahora ya tenemos los colegios con las distancias mas cercanas!
+
+
+
+bloque1 <- barrios_vul_bloqp %>%
+  filter(barrios_nom == "Villa_31", bloque == 1)
+
+buffer_500 <- st_buffer(bloque1, dist = 500)
+buffer_1000 <- st_buffer(bloque1, dist = 1000)
+buffer_2000 <- st_buffer(bloque1, dist = 2000)
+escuelas_500 <- educ_sna[st_intersects(educ_sna, st_union(buffer_500), sparse = FALSE), ]
+escuelas_1000 <- educ_sna[st_intersects(educ_sna, st_union(buffer_1000), sparse = FALSE), ]
+escuelas_2000 <- educ_sna[st_intersects(educ_sna, st_union(buffer_2000), sparse = FALSE), ]
+
+tabla1_500 <- osrmTable(src = bloque1, dst = escuelas_500, osrm.profile = "foot")$durations
+
+head(tabla1_500)
+
+barrios_vul_bloqp <- barrios_vul_puntos %>%
+  group_by(barrios_nom) %>%
+  mutate(bloque = ceiling(row_number() / 50))
+
+
+
+barrios_vul_bloqp %>%
+  count(barrios_nom, bloque) %>%
+  arrange(barrios_nom, bloque)
+
