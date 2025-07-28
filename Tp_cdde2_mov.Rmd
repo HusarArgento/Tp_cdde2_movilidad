@@ -331,7 +331,7 @@ barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31","Villa 3
     NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
     NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
     NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
-    NOMBRE == "Villa 21-24" ~ "Villa_21-24"
+    NOMBRE == "Villa 21-24" ~ "Villa_21_24"
   ))  %>%
   rename(barrios_nom = NOMBRE)
  #Renombramos para que sea mas facil manejar el dato
@@ -342,6 +342,9 @@ rm(barrios_vul)
 rm(barrios_vul_rs)
 
 write.csv(barrios_vul_selec, "barrios_vul_selec.csv", row.names = TRUE)
+
+
+
 
 ```
 
@@ -371,6 +374,8 @@ rm(buffer_vul_2000)
 
 barrios_vul_educ <- st_join(buffers_barrios_vul, educ_sna, join = st_intersects)
 filter(!is.na(distancia))
+
+
 ```
 
 ```{r}
@@ -431,6 +436,68 @@ ggplot()+
   theme_minimal()
 ```
 
+
+```{r}
+barrios_vul_puntos <- barrios_vul_selec %>%
+  st_point_on_surface() %>%
+  select(Id, barrios_nom, CO_FRAC_RA, TIPO_ASENT,MANZANA, Superficie, geometry)  # Ajustá según tus columnas
+
+radios_vul8 <- barrios_vul_puntos %>% 
+  group_by(barrios_nom) %>% 
+  arrange(desc(Superficie)) %>% 
+  slice_head(n = 8) %>%
+  ungroup()
+buff_vul_500 <- st_buffer(radios_vul8, dist = 500)
+buff_vul_1000 <- st_buffer(radios_vul8, dist = 1000)
+buff_vul_2000 <- st_buffer(radios_vul8, dist = 2000)
+
+escuelasvul_500 <- st_filter(educ_sna, buff_vul_500)
+escuelasvul_1000 <- st_filter(educ_sna, buff_vul_1000)
+escuelasvul_2000 <- st_filter(educ_sna, buff_vul_2000)
+
+
+
+barrios_vul_bloqp <- barrios_vul_puntos %>% 
+  group_by(barrios_nom) %>%
+  mutate(bloque = ceiling(row_number() / 50))
+
+
+
+barrios_vul_bloqp %>% 
+  count(barrios_nom, bloque) %>% 
+  arrange(barrios_nom, bloque)
+
+
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+bloque1 <- barrios_vul_bloqp %>%
+  filter(barrios_nom == "Villa_31", bloque == 1)
+
+buffer_500 <- st_buffer(bloque1, dist = 500)
+buffer_1000 <- st_buffer(bloque1, dist = 1000)
+buffer_2000 <- st_buffer(bloque1, dist = 2000)
+escuelas_500 <- educ_sna[st_intersects(educ_sna, st_union(buffer_500), sparse = FALSE), ]
+escuelas_1000 <- educ_sna[st_intersects(educ_sna, st_union(buffer_1000), sparse = FALSE), ]
+escuelas_2000 <- educ_sna[st_intersects(educ_sna, st_union(buffer_2000), sparse = FALSE), ]
+
+tabla1_500 <- osrmTable(src = bloque1, dst = escuelas_500, osrm.profile = "foot")$durations
+
+head(tabla1_500)
+
+```
+
+
+
 ```{r}
 #Geoconsultas OSM
 
@@ -489,6 +556,22 @@ proximidad <- st_join(barrios_puntos, educ_barrios_vul, join = st_nearest_featur
 
 
 ```{r}
+
+
+# Supongamos que barrios_vul_puntos está en CRS métrico, si no, transformalo:
+
+# Crear buffers de 500 metros
+circulo_500 <- st_buffer(barrios_vul_puntos, dist = 500)
+escuelas_en_buffer <- educ_sna[st_intersects(educ_sna, st_union(circulo_500), sparse = FALSE), ]
+
+# Identificar qué buffers tienen escuelas
+intersecciones <- st_intersects(circulo_500, educ_sna, sparse = FALSE)
+
+# Sumar filas (cada fila es un buffer/punto)
+puntos_con_escuela <- rowSums(intersecciones) > 0
+
+# Ver cuántos puntos tienen al menos una escuela cerca
+sum(puntos_con_escuela)
 
 ```
 
