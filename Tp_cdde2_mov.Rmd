@@ -455,6 +455,37 @@ escuelasvul_500 <- st_filter(educ_sna, buff_vul_500)
 escuelasvul_1000 <- st_filter(educ_sna, buff_vul_1000)
 escuelasvul_2000 <- st_filter(educ_sna, buff_vul_2000)
 
+library(osrm)
+library(dplyr)
+library(tidyr)
+library(sf)
+
+# 1. Configurar OSRM en modo a pie
+options(osrm.profile = "foot")
+
+# 2. Transformar ambos datasets a CRS 4326 (WGS84)
+radios_vul8 <- st_transform(radios_vul8, 4326)
+escuelasvul_500 <- st_transform(escuelas_500, 4326)
+
+# 3. Ejecutar la matriz de tiempos
+tabla_tiempos <- osrmTable(
+  src = radios_vul8,
+  dst = escuelas_500
+)
+
+# 4. Convertir matriz a formato largo para análisis
+df_tiempos <- as.data.frame(tabla_tiempos$durations)
+df_tiempos$radio_id <- rownames(df_tiempos)
+
+df_tiempos_largo <- df_tiempos %>%
+  pivot_longer(
+    cols = -radio_id,
+    names_to = "escuela_id",
+    values_to = "tiempo_min"
+  )
+
+# 5. (Opcional) Guardar resultados
+write.csv(df_tiempos_largo, "tiempos_radios_escuelas_500.csv", row.names = FALSE)
 
 
 barrios_vul_bloqp <- barrios_vul_puntos %>% 
@@ -480,19 +511,6 @@ barrios_vul_bloqp %>%
 
 
 ```{r}
-bloque1 <- barrios_vul_bloqp %>%
-  filter(barrios_nom == "Villa_31", bloque == 1)
-
-buffer_500 <- st_buffer(bloque1, dist = 500)
-buffer_1000 <- st_buffer(bloque1, dist = 1000)
-buffer_2000 <- st_buffer(bloque1, dist = 2000)
-escuelas_500 <- educ_sna[st_intersects(educ_sna, st_union(buffer_500), sparse = FALSE), ]
-escuelas_1000 <- educ_sna[st_intersects(educ_sna, st_union(buffer_1000), sparse = FALSE), ]
-escuelas_2000 <- educ_sna[st_intersects(educ_sna, st_union(buffer_2000), sparse = FALSE), ]
-
-tabla1_500 <- osrmTable(src = bloque1, dst = escuelas_500, osrm.profile = "foot")$durations
-
-head(tabla1_500)
 
 ```
 
@@ -536,18 +554,6 @@ unique(st_geometry_type(educ_barrios_vul))      # También "POINT"
 ```
 
 
-
-```{r}
-barrios_test <- barrios_puntos[1:3, ]
-escuelas_test <- educ_barrios_vul[1:10, ]
-
-distancias_test <- osrmTable(
-  src = barrios_test,
-  dst = escuelas_test,
-  osrm.profile = "foot"
-)
-
-```
 
 ```{r}
 proximidad <- st_join(barrios_puntos, educ_barrios_vul, join = st_nearest_feature)
