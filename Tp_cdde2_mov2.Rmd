@@ -1,0 +1,555 @@
+---
+title: "Tp_movilidad_cdde2"
+author: "Lucas S. Melfi"
+date: "2025-05-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Librerías}
+library(tidyverse)
+library(here)
+library(sf)
+library(nngeo)
+library(leaflet)
+library(fs)
+library(osmdata)
+library(osrm)
+library(openrouteservice)
+```
+
+
+```{r Urls}
+
+
+url_barrios2 <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-desarrollo-humano-y-habitat/barrios-populares"
+
+url_comunas <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson"
+
+url_barrioscaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/barrios/barrios.geojson"
+
+url_educativos <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/establecimientos-educativos/establecimientos_educativos.geojson"
+
+url_radiocensalcaba <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/direccion-general-de-estadisticas-y-censos/informacion-censal-por-radio/caba_radios_censales.geojson"
+
+url_radiosamba <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Shapes.rar"
+
+url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empleo-AMBA.csv"
+
+
+
+```
+
+
+```{r}
+#1 Carga de datos
+#1.1 Mapa base Radio Censales AMBA
+
+td <- tempdir()
+rar_path <- path(td, "Shapes.rar")
+download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
+system(paste('"D:/PROGRAMS-HDD/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+list.files(td, pattern = "\\.shp$", recursive = TRUE)
+radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
+list.files(td, recursive = TRUE)
+rm(td)
+st_crs(radios2)
+sum(!st_is_valid(radios2))
+radios2 <- st_transform(radios2, 5347)
+```
+
+
+```{r}
+#Dataset ingreso medio AMBA (2022)
+radio_socioeco <- read.csv(url_radiosocioeco, fileEncoding = "latin1")
+```
+
+```{r}
+#Join Df Espacial/No Espacial: Mapa de Radio Censales e Ingresos 
+
+mapa_eco <- left_join(radios2, radio_socioeco, by = c("CO_FRAC_RA" = "LINK" ) ) %>%
+  filter(!is.na(Remuneracion_media)) 
+rm(radio_socioeco)
+```
+
+
+```{r}
+#Ordenamos y clasificamos los clusters
+
+baires_ecorad <- mapa_eco  %>% filter(provincia_id == 2, Remuneracion_media > 30000 ) #Filtrado de CABA
+ 
+bairescm_q <- baires_ecorad %>% mutate(cluster = case_when( 
+  Remuneracion_media <= quantile(Remuneracion_media, 0.25, na.rm = TRUE) ~ "Clase baja",
+  Remuneracion_media <= quantile(Remuneracion_media, 0.50, na.rm = TRUE) ~ "Clase media",  
+  Remuneracion_media <= quantile(Remuneracion_media, 0.75, na.rm = TRUE) ~ "Clase media alta", 
+  TRUE ~ "Clase alta"
+  ))
+
+```
+
+
+```{r}
+#Cargamos el mapa de barrios y le transformamos el crs
+barrioscm_caba <- st_read(url_barrioscaba)
+st_crs(barrioscm_caba)
+sum(!st_is_valid(barrioscm_caba))
+barrioscm_caba <- st_transform(barrioscm_caba, 5347)
+
+#Join espacial para ubicar radio censales en barrios
+barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
+
+#Seleccionamos columnas que nos interesan y renombramos
+barrioscm_sjs <- barrios_cm_sj %>% 
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
+  rename(barrios_nom = nombre)
+rm(barrios_cm_sj)
+```
+
+
+
+
+```{r}
+#Agrupamos por barrios y filtramos los que nos interesan 
+barrioscm_fil <- barrioscm_sjs %>%
+  filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
+           barrios_nom == "Caballito" & cluster == "Clase media alta"|
+           barrios_nom == "Almagro" & cluster == "Clase media" ) %>%
+  group_by(barrios_nom) %>%
+  arrange(desc (Remuneracion_media)) %>%
+  slice_head(n=8) %>%
+  ungroup()
+rm(barrioscm_sjs)
+
+```
+
+
+
+
+
+```{r}
+#Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
+radio_bsas <-  st_read(url_radiocensalcaba)
+st_crs(radio_bsas)
+sum(!st_is_valid(radio_bsas))
+radio_bsas <- st_transform(radio_bsas, 5347)
+```
+
+
+
+```{r}
+#Primera visualizacion: Distribucion socio economica de caba  
+ggplot() + 
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
+  geom_sf(data = barrioscm_fil, aes(fill = barrios_nom), color = "white", size = 0.2) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal()
+```
+
+
+
+
+
+
+
+```{r}
+#Trabajamos con anillos concentricos en vez de buffers
+
+# Hacemos  buffers individuales, necesarios para esta operacion
+buffer_500 <- barrioscm_fil %>% st_buffer(dist = 500)
+buffer_1000 <- barrioscm_fil %>% st_buffer(dist = 1000)
+buffer_2000 <- barrioscm_fil %>% st_buffer(dist = 2000)
+
+# Crear los anillos concéntricos
+barrioscm_anillos <- bind_rows(
+  buffer_500 %>% mutate(distancia = "0-500m"),                              # Anillo interior completo
+  st_difference(buffer_1000, buffer_500) %>% mutate(distancia = "500-1000m"),  # Solo la corona entre 500-1000m
+  st_difference(buffer_2000, buffer_1000) %>% mutate(distancia = "1000-2000m")  # Solo la corona entre 1000-2000m
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+```
+
+
+
+```{r}
+#cargamos las escuelas
+educ <- st_read(url_educativos)
+sum(!st_is_valid(educ))
+educ <- st_transform(educ, 5347) %>% 
+  select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
+
+educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
+rm(educ)
+
+  
+```
+
+```{r}
+#Hacemos los joins
+  barrioscm_educ <- st_join(barrioscm_anillos, educ_sna, join = st_intersects)
+  educ_barrioscm <- st_join(educ_sna, barrioscm_anillos, join = st_intersects)%>%
+    filter(!is.na(distancia)) 
+```
+
+
+```{r}
+#Visualizacion
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
+  geom_sf(data = barrioscm_educ, aes(fill = distancia), alpha = 0.02) +
+  geom_sf(data = educ_barrioscm, aes(fill = tipo_gestion), alpha = 0.5) +
+  labs(title = "Escuelas por tipo de gestión dentro de los buffers",
+       fill = "Gestión escolar") +
+  theme_minimal()
+```
+
+
+
+
+```{r}
+p1 <- ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1)
+p2 <- p1 +
+  geom_sf(data = barrioscm_educ, aes(color = distancia), alpha = 0.01, size = 1)
+print(p2)
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", alpha = 0.3, size = 0.1)+
+  geom_sf(data = barrioscm_educ, aes(fill = distancia), color = "violet", alpha = 0.3) +
+  geom_sf(data = educ_barrioscm, color = "blue", size = 1) +
+  labs(
+    title = "Escuelas dentro de radios de barrios de clase media y alta",
+    fill = "Radio del buffer"
+  ) +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(educ_barrios) +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "white") +
+  geom_sf(aes(color = distancia), size = 1, alpha = 0.7) +
+  facet_wrap(distancia~barrios_nom) +
+  scale_color_brewer(palette = "Set2")+
+    theme_minimal() +
+  labs(
+    title = "Escuelas dentro de buffers de barrios de clase media y alta",
+    color = "Distancia al barrio"
+  )
+```
+
+
+```{r}
+
+conteo_escuelasbarrios <- barrios_educ %>%
+  group_by(barrios_nom, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
+  summarize(cantidad_escuelas = n(), .groups = "drop")
+```
+
+
+```{r}
+ggplot(conteo_escuelasbarrios, aes(x = barrios_nom, y = cantidad_escuelas, fill = distancia)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Cantidad de escuelas cercanas por barrio y distancia",
+    x = "Barrio",
+    y = "Cantidad de escuelas",
+    fill = "Distancia del barrio"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+ggplot(conteo_escuelasbarrios, aes(x = distancia, y = cantidad_escuelas, fill = distancia)) +
+  geom_col() +
+  facet_wrap(~barrios_nom) +
+  labs(
+    title = "Escuelas dentro del radio de cada barrio",
+    x = "Distancia",
+    y = "Cantidad de escuelas"
+  ) +
+  theme_minimal()
+```
+
+
+```{r Barrios Populares}
+td <- tempdir()
+  download.file(url = paste(url_barrios2,
+                            "barrios-populares-badata.zip",
+                            sep = "/"),
+                destfile = fs::path(td, "barrios-populares-badata.zip") )
+  unzip(zipfile = fs::path(td, "barrios-populares-badata.zip"),
+        exdir = td)
+  barrios_vul <- read_sf(fs::path(td, "barrios_vulnerables.shp"))
+  rm(td)  
+st_crs(barrios_vul)
+sum(!st_is_valid(barrios_vul))
+barrios_vul <- st_transform(barrios_vul, 5347)
+   
+
+```
+#Barrios populares 
+Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
+#TIPO_ASENT		
+Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
+
+
+```{r}
+#Primera visualizacion barrios pop en radio censales
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
+  geom_sf(data = barrios_vul, fill = "red", color = "red", alpha = 1) +
+  labs(title = "Ubicación de barrios populares  de CABA - Radiocensales",
+       fill = "Comuna") +
+  theme_minimal()
+```
+
+
+
+#Barrios populares 
+Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
+#TIPO_ASENT		
+Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
+
+#Comunas
+Este conjunto de datos proporciona información sobre la ubicación, perímetro y área de las comunas de la Ciudad de Buenos Aires, establecidas a partir de la Ley Orgánica de Comunas (Ley Nº 1777/2005). La información permite analizar la distribución territorial y la organización administrativa de la ciudad, facilitando estudios de planificación urbana y gestión pública.
+
+
+
+```{r Operaciones}
+#Hacemos el space join entre los barrios y los radiocensales, para unir solo las partes de la geometria, es decir los radiocensales, que se intersectan con los barrios populares
+
+barrios_vul_rs <- st_join(barrios_vul, radios2, join = st_intersects) 
+
+
+barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31","Villa 31 - Padre Mugica", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
+  mutate(NOMBRE = case_when(
+    NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 21-24" ~ "Villa_21_24"
+  ))  %>%
+  rename(barrios_nom = NOMBRE)
+ #Renombramos para que sea mas facil manejar el dato
+
+barrios_vul_selec <- barrios_vul_selec %>%
+  mutate(barrios_nom = coalesce(barrios_nom, "Villa_31")) #esto para que renombre los NA como Villa 31 que es el primer string
+rm(barrios_vul)
+rm(barrios_vul_rs)
+
+#write.csv(barrios_vul_selec, "barrios_vul_selec.csv", row.names = TRUE)
+
+
+
+
+```
+
+```{r}
+#Esto lo hacemos para no pagar tanto costo computacional en las oepraciones, sobre todo geoconsultas
+barrios_vul_puntos <- barrios_vul_selec %>%
+  st_point_on_surface() %>%
+  select(Id, barrios_nom, CO_FRAC_RA, TIPO_ASENT,MANZANA, Superficie, geometry)  # Ajustá según tus columnas
+  
+#Agrupamos y tomamos los 8 radiocensales mas extensos en superficie de cada barrio popular
+radios_vul8 <- barrios_vul_puntos %>% 
+  group_by(barrios_nom) %>% 
+  arrange(desc(Superficie)) %>% 
+  slice_head(n = 8) %>%
+  ungroup()
+
+buff_vul_500  <- barrios_vul_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m")
+buff_vul_1000 <- barrios_vul_puntos %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_vul_2000 <- barrios_vul_puntos %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+buffers_vul_bind <- bind_rows(buff_vul_500, buff_vul_1000, buff_vul_2000)
+escuelas_vul_filto <- st_filter(educ_sna, buffers_vul_bind)
+escuelas_vulbuffer <- st_join(escuelas_vul_filto, buffers_vul_bind, join = st_intersects)
+conteo_escuelasvulpun <- escuelas_vulbuffer %>%
+  group_by(buffer) %>%
+  summarise(total = n())
+
+```
+
+
+```{r Visualizaciones}
+
+#Para visualizar no lo podemos hacer por puntos dado que queda muy superpuesto, hay que bufferear de vuelta
+
+radios_union <- radios_vul8 %>%
+  group_by(barrios_nom) %>%
+  summarise(geometry = st_union(geometry))
+buff_500  <- st_buffer(radios_union, 500) %>% mutate(buffer = "0-500m")
+buff_1000 <- st_buffer(radios_union, 1000) %>% mutate(buffer = "0-1000m")
+buff_2000 <- st_buffer(radios_union, 2000) %>% mutate(buffer = "0-2000m")
+anillos2 <- bind_rowsws(
+  buff_500,
+  st_difference(buff_1000, buff_500) %>% mutate(buffer = "500-1000m"),
+  st_difference(buff_2000, buff_1000) %>% mutate(buffer = "1000-2000m")
+)
+
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "black") +
+  geom_sf(
+    data = anillos2,
+    aes(fill = buffer),
+    color = "black",
+    alpha = 0.1
+  ) +
+  geom_sf(
+    data = escuelas_vulbuffer, 
+    aes(color = tipo_gestion), 
+    size = 1
+  ) +
+  scale_fill_manual(
+    values = c("0-500m" = "red", "500-1000m" = "orange", "1000-2000m" = "blue")
+  ) +
+  theme_minimal() +
+  labs(
+    title = "Escuelas dentro de anillos de barrios vulnerables",
+    fill = "Rango de distancia",
+    color = "Tipo de gestión"
+  )
+
+
+
+```
+
+
+
+
+
+```{r}
+#Conteo
+conteo_esc_bpop <- barrios_vul_educ %>%
+  group_by(NOMBRE, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
+  summarize(cantidad_escuelas = n(), .groups = "drop") %>%
+  arrange(NOMBRE, distancia)
+
+
+```
+
+```{r}
+ggplot(conteo_esc_bpop, aes(x = NOMBRE, y = cantidad_escuelas, fill = distancia)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Cantidad de escuelas cercanas por barrio vulnerable y distancia",
+    x = "Barrio",
+    y = "Cantidad de escuelas",
+    fill = "Distancia del barrio"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+ggplot()+
+  geom_col(data = conteo_esc_bpop, aes(x = distancia, y = cantidad_escuelas, fill = distancia)) +
+  facet_wrap(~NOMBRE) +
+  labs(
+    title = "Escuelas dentro del radio de cada barrio",
+    x = "Distancia",
+    y = "Cantidad de escuelas"
+  ) +
+  theme_minimal()
+```
+
+
+```{r Geoconsulta tiempos a pie}
+
+
+# 1. Configurar OSRM en modo a pie
+options(osrm.profile = "foot")
+
+# 2. Transformar ambos datasets a CRS 4326 (WGS84)
+radios_vul8 <- st_transform(radios_vul8, 4326)
+escuelasvul_500 <- st_transform(escuelasvul_500, 4326)
+
+```
+
+
+```{r}
+#de una sola vez
+# 500 m
+tabla_tiempos <- osrmTable(src = radios_vul8, dst = escuelasvul_500)
+df_tiempos <- as.data.frame(tabla_tiempos$durations)
+df_tiempos$radio_id <- rownames(df_tiempos)
+df_tiempos_largo <- df_tiempos %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min")
+
+# 1000 m
+tabla_tiempos2 <- osrmTable(src = radios_vul8, dst = escuelasvul_1000)
+df_tiempos2 <- as.data.frame(tabla_tiempos2$durations)
+df_tiempos2$radio_id <- rownames(df_tiempos2)
+df_tiempos_largo2 <- df_tiempos2 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min")
+
+# 2000 m
+tabla_tiempos3 <- osrmTable(src = radios_vul8, dst = escuelasvul_2000)
+df_tiempos3 <- as.data.frame(tabla_tiempos3$durations)
+df_tiempos3$radio_id <- rownames(df_tiempos3)
+df_tiempos_largo3 <- df_tiempos3 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min")
+```
+
+
+```{r}
+# Primero agregamos la etiqueta del buffer a cada tabla
+df_tiempos_largo  <- df_tiempos_largo  %>% mutate(buffer = "500m")
+df_tiempos_largo2 <- df_tiempos_largo2 %>% mutate(buffer = "1000m")
+df_tiempos_largo3 <- df_tiempos_largo3 %>% mutate(buffer = "2000m")
+
+# Unificamos en una sola tabla
+df_tiempos_total_vul <- bind_rows(
+  df_tiempos_largo,
+  df_tiempos_largo2,
+  df_tiempos_largo3
+)
+
+```
+
+
+
+```{r}
+# Calculo en Multipoligon
+
+# 1. Simplificar barrios para reducir vértices
+barrios_simpl <- st_simplify(barrios_vul_selec, dTolerance = 50)
+
+# 2. Buffers y anillos concéntricos
+buff_500  <- st_buffer(barrios_simpl, 500)
+buff_1000 <- st_buffer(barrios_simpl, 1000)
+buff_2000 <- st_buffer(barrios_simpl, 2000)
+
+anillos <- bind_rows(
+  buff_500 %>% mutate(distancia = "0-500m"),
+  st_difference(buff_1000, buff_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(buff_2000, buff_1000) %>% mutate(distancia = "1000-2000m")
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+# 3. Filtrar escuelas solo una vez (intersección directa)
+escuelas_en_buffers <- st_filter(educ_sna, anillos)
+
+# 4. Contar escuelas por distancia
+conteo <- escuelas_en_buffers %>%
+  st_join(anillos, join = st_intersects) %>%
+  st_drop_geometry() %>%
+  group_by(distancia) %>%
+  summarise(total = n())
+
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
