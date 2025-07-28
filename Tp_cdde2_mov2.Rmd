@@ -434,28 +434,29 @@ conteo_esc_bpop <- barrios_vul_educ %>%
 ```
 
 ```{r}
-ggplot(conteo_esc_bpop, aes(x = NOMBRE, y = cantidad_escuelas, fill = distancia)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(
-    title = "Cantidad de escuelas cercanas por barrio vulnerable y distancia",
-    x = "Barrio",
-    y = "Cantidad de escuelas",
-    fill = "Distancia del barrio"
-  ) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 ```
 
 ```{r}
-ggplot()+
-  geom_col(data = conteo_esc_bpop, aes(x = distancia, y = cantidad_escuelas, fill = distancia)) +
-  facet_wrap(~NOMBRE) +
+library(ggplot2)
+
+ggplot(conteo_escuelasvulpun, aes(x = buffer, y = total, fill = buffer)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = total), vjust = -0.5) +
+  scale_fill_brewer(palette = "Set2") +
   labs(
-    title = "Escuelas dentro del radio de cada barrio",
-    x = "Distancia",
-    y = "Cantidad de escuelas"
+    title = "Cantidad de escuelas dentro de cada buffer",
+    x = "Buffer de distancia",
+    y = "Número de escuelas"
   ) +
   theme_minimal()
+
+```
+
+
+
+```{r}
+
 ```
 
 
@@ -536,16 +537,82 @@ anillos <- bind_rows(
 escuelas_en_buffers <- st_filter(educ_sna, anillos)
 
 # 4. Contar escuelas por distancia
-conteo <- escuelas_en_buffers %>%
+conteopoli <- escuelas_en_buffers %>%
   st_join(anillos, join = st_intersects) %>%
   st_drop_geometry() %>%
   group_by(distancia) %>%
   summarise(total = n())
 
+#Conteo
+conteo_esc_bpop <- barrios_vul_educ %>%
+  group_by(NOMBRE, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
+  summarize(cantidad_escuelas = n(), .groups = "drop") %>%
+  arrange(NOMBRE, distancia)
+
+```
+```{r}
+# 1. Simplificar geometría de los barrios
+barrios_simpl <- st_simplify(barrios_vul_selec, dTolerance = 50)
+
+# 2. Buffers y anillos concéntricos
+anillos <- bind_rows(
+  st_buffer(barrios_simpl, 500) %>% mutate(buffer = "0-500m"),
+  st_difference(st_buffer(barrios_simpl, 1000), st_buffer(barrios_simpl, 500)) %>% mutate(buffer = "500-1000m"),
+  st_difference(st_buffer(barrios_simpl, 2000), st_buffer(barrios_simpl, 1000)) %>% mutate(buffer = "1000-2000m")
+) %>%
+  mutate(buffer = factor(buffer, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+# 3. Filtrar y asignar buffer en un solo join
+escuelas_vulbuffer <- st_join(
+  educ_sna,   anillos %>% 
+    select(buffer, barrios_nom),
+  join = st_intersects
+)
+
+# 4. Conteo único
+conteo_escuelas <- escuelas_vulbuffer %>%
+  st_drop_geometry() %>%
+  group_by(buffer, barrios_nom) %>%
+  summarise(total = n(), .groups = "drop") %>% 
+  mutate(buffer = factor(buffer, levels = c("0-500m", "500-1000m", "1000-2000m"))) %>%
+  arrange(barrios_nom, buffer) 
 
 ```
 
+
 ```{r}
+ggplot()+
+  geom_col(data = conteo_esc_bpop, aes(x = distancia, y = total, fill = distancia)) +
+  facet_wrap(~NOMBRE) +
+  labs(
+    title = "Escuelas dentro del radio de cada barrio",
+    x = "Distancia",
+    y = "Cantidad de escuelas"
+  ) +
+  theme_minimal()
+
+
+ggplot(conteo_escuelas, aes(x = buffer, y = total, fill = buffer)) +
+  geom_col() +
+  facet_wrap(~barrios_nom) +
+  labs(
+    title = "Escuelas dentro del radio de cada barrio",
+    x = "Distancia",
+    y = "Cantidad de escuelas"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(conteo_escuelas, aes(x = barrios_nom, y = total, fill = buffer)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Cantidad de escuelas cercanas por barrio vulnerable y distancia",
+    x = "Barrio",
+    y = "Cantidad de escuelas",
+    fill = "Distancia del barrio"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
