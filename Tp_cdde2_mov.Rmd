@@ -437,7 +437,7 @@ ggplot()+
 ```
 
 
-```{r}
+```{r Geoconsulta tiempos a pie}
 barrios_vul_puntos <- barrios_vul_selec %>%
   st_point_on_surface() %>%
   select(Id, barrios_nom, CO_FRAC_RA, TIPO_ASENT,MANZANA, Superficie, geometry)  # Ajustá según tus columnas
@@ -455,10 +455,6 @@ escuelasvul_500 <- st_filter(educ_sna, buff_vul_500)
 escuelasvul_1000 <- st_filter(educ_sna, buff_vul_1000)
 escuelasvul_2000 <- st_filter(educ_sna, buff_vul_2000)
 
-library(osrm)
-library(dplyr)
-library(tidyr)
-library(sf)
 
 # 1. Configurar OSRM en modo a pie
 options(osrm.profile = "foot")
@@ -470,7 +466,7 @@ escuelasvul_500 <- st_transform(escuelas_500, 4326)
 # 3. Ejecutar la matriz de tiempos
 tabla_tiempos <- osrmTable(
   src = radios_vul8,
-  dst = escuelas_500
+  dst = escuelasvul_500
 )
 
 # 4. Convertir matriz a formato largo para análisis
@@ -484,26 +480,6 @@ df_tiempos_largo <- df_tiempos %>%
     values_to = "tiempo_min"
   )
 
-# 5. (Opcional) Guardar resultados
-write.csv(df_tiempos_largo, "tiempos_radios_escuelas_500.csv", row.names = FALSE)
-
-
-barrios_vul_bloqp <- barrios_vul_puntos %>% 
-  group_by(barrios_nom) %>%
-  mutate(bloque = ceiling(row_number() / 50))
-
-
-
-barrios_vul_bloqp %>% 
-  count(barrios_nom, bloque) %>% 
-  arrange(barrios_nom, bloque)
-
-
-
-
-
-
-
 
 
 
@@ -511,46 +487,44 @@ barrios_vul_bloqp %>%
 
 
 ```{r}
+# 3. Ejecutar la matriz de tiempos
+tabla_tiempos2 <- osrmTable(
+  src = radios_vul8,
+  dst = escuelasvul_1000
+)
+
+# 4. Convertir matriz a formato largo para análisis
+df_tiempos2 <- as.data.frame(tabla_tiempos$durations)
+df_tiempos2$radio_id <- rownames(df_tiempos)
+
+df_tiempos_largo2 <- df_tiempos2 %>%
+  pivot_longer(
+    cols = -radio_id,
+    names_to = "escuela_id",
+    values_to = "tiempo_min"
+  )
 
 ```
 
 
 
 ```{r}
-#Geoconsultas OSM
-
-geo_baires <- opq(bbox = "Ciudad Autónoma de Buenos Aires") %>%
-  add_osm_feature(key = "highway", value = "footway")
-available_features()
-
-
-distancias_osrm <- osrmTable(
-  src = barrios_vul_selec,           # tus barrios vulnerables ( polígonos)
-  dst = educ_barrios_vul,       # solo las escuelas cercanas por buffer
-  osrm.profile = "foot"          # caminando
+# 3. Ejecutar la matriz de tiempos
+tabla_tiempos3 <- osrmTable(
+  src = radios_vul8,
+  dst = escuelas_2000
 )
 
-#El problema es que el source (src) debe ser punto. Entonces transformamos puntos. Al ser radiocensal la perdida de precisión es mínima.
+# 4. Convertir matriz a formato largo para análisis
+df_tiempos3 <- as.data.frame(tabla_tiempos$durations)
+df_tiempos3$radio_id <- rownames(df_tiempos)
 
-barrios_puntos <- barrios_vul_selec %>%
-  st_point_on_surface()
-
-distancias_osrm <- osrmTable(
-  src = barrios_puntos,           # tus barrios vulnerables ( polígonos)
-  dst = proximidad,       # solo las escuelas cercanas por buffer
-  osrm.profile = "foot"          # caminando
-)
-
-barrios_puntos <- barrios_vul_selec %>% 
-  st_cast("POINT")
-st_geometry_type(barrios_puntos) %>% unique()
-
-barrios_puntos$id <- paste0("barrio_", seq_len(nrow(barrios_puntos)))
-educ_barrios_vul$id <- paste0("escuela_", seq_len(nrow(educ_barrios_vul)))
-
-unique(st_geometry_type(barrios_puntos))        # Debería devolver "POINT"
-unique(st_geometry_type(educ_barrios_vul))      # También "POINT"
-
+df_tiempos_largo3 <- df_tiempos3 %>%
+  pivot_longer(
+    cols = -radio_id,
+    names_to = "escuela_id",
+    values_to = "tiempo_min"
+  )
 ```
 
 
@@ -562,42 +536,27 @@ proximidad <- st_join(barrios_puntos, educ_barrios_vul, join = st_nearest_featur
 
 
 ```{r}
+#de una sola vez
+# 500 m
+tabla_tiempos <- osrmTable(src = radios_vul8, dst = escuelasvul_500)
+df_tiempos <- as.data.frame(tabla_tiempos$durations)
+df_tiempos$radio_id <- rownames(df_tiempos)
+df_tiempos_largo <- df_tiempos %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min")
 
+# 1000 m
+tabla_tiempos2 <- osrmTable(src = radios_vul8, dst = escuelasvul_1000)
+df_tiempos2 <- as.data.frame(tabla_tiempos2$durations)
+df_tiempos2$radio_id <- rownames(df_tiempos2)
+df_tiempos_largo2 <- df_tiempos2 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min")
 
-# Supongamos que barrios_vul_puntos está en CRS métrico, si no, transformalo:
-
-# Crear buffers de 500 metros
-circulo_500 <- st_buffer(barrios_vul_puntos, dist = 500)
-escuelas_en_buffer <- educ_sna[st_intersects(educ_sna, st_union(circulo_500), sparse = FALSE), ]
-
-# Identificar qué buffers tienen escuelas
-intersecciones <- st_intersects(circulo_500, educ_sna, sparse = FALSE)
-
-# Sumar filas (cada fila es un buffer/punto)
-puntos_con_escuela <- rowSums(intersecciones) > 0
-
-# Ver cuántos puntos tienen al menos una escuela cerca
-sum(puntos_con_escuela)
-
-```
-
-
-```{r}
-  
-```
-
-
-```{r}
-
-```
-
-
-
-```{r}
-```
-
-```{r}
-
+# 2000 m
+tabla_tiempos3 <- osrmTable(src = radios_vul8, dst = escuelas_2000)
+df_tiempos3 <- as.data.frame(tabla_tiempos3$durations)
+df_tiempos3$radio_id <- rownames(df_tiempos3)
+df_tiempos_largo3 <- df_tiempos3 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min")
 ```
 
 
@@ -605,11 +564,10 @@ sum(puntos_con_escuela)
 
 ```
 
+
+
 ```{r}
-
 ```
-
-
 
 ```{r}
 
@@ -619,4 +577,3 @@ sum(puntos_con_escuela)
 ```{r}
 
 ```
-
