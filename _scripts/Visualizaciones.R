@@ -183,3 +183,15 @@ leaflet() %>%
               weight = 1,
               fillOpacity = 0.6,
               label = ~ Remuneracion_media)
+
+
+ggplot(conteo_escuelasvulpun, aes(x = buffer, y = total, fill = buffer)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = total), vjust = -0.5) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Cantidad de escuelas dentro de cada buffer",
+    x = "Buffer de distancia",
+    y = "Número de escuelas"
+  ) +
+  theme_minimal()

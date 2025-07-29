@@ -139,3 +139,65 @@ barrioscm_sjs <- barrios_cm_sj %>%
   select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
   rename(barrios_nom = nombre)
 #rm(barrios_cm_sj)
+
+
+
+
+# Calculo en Multipoligon
+
+# 1. Simplificar barrios para reducir vértices
+barrios_vul_simpl <- st_simplify(barrios_vul_selec, dTolerance = 50)
+
+# 2. Buffers y anillos concéntricos
+buff_500  <- st_buffer(barrios_vul_simpl, 500)
+buff_1000 <- st_buffer(barrios_vul_simpl, 1000)
+buff_2000 <- st_buffer(barrios_vul_simpl, 2000)
+
+anillos_vul <- bind_rows(
+  buff_500 %>% mutate(distancia = "0-500m"),
+  st_difference(buff_1000, buff_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(buff_2000, buff_1000) %>% mutate(distancia = "1000-2000m")
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+# 3. Filtrar escuelas solo una vez (intersección directa)
+escuelas_vul_buffers <- st_filter(educ_sna, anillos)
+
+# 4. Contar escuelas por distancia
+conteopoli <- escuelas_vul_buffers %>%
+  st_join(anillos_vul, join = st_intersects) %>%
+  st_drop_geometry() %>%
+  group_by(distancia) %>%
+  summarise(total = n())
+
+#Conteo
+conteo_esc_vul <- barrios_vul_educ %>%
+  group_by(NOMBRE, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
+  summarize(cantidad_escuelas = n(), .groups = "drop") %>%
+  arrange(NOMBRE, distancia)
+
+# 1. Simplificar geometría de los barrios
+barrios_simpl <- st_simplify(barrios_vul_selec, dTolerance = 50)
+
+# 2. Buffers y anillos concéntricos
+anillos <- bind_rows(
+  st_buffer(barrios_simpl, 500) %>% mutate(buffer = "0-500m"),
+  st_difference(st_buffer(barrios_simpl, 1000), st_buffer(barrios_simpl, 500)) %>% mutate(buffer = "500-1000m"),
+  st_difference(st_buffer(barrios_simpl, 2000), st_buffer(barrios_simpl, 1000)) %>% mutate(buffer = "1000-2000m")
+) %>%
+  mutate(buffer = factor(buffer, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+# 3. Filtrar y asignar buffer en un solo join
+escuelas_vulbuffer <- st_join(
+  educ_sna,   anillos %>%
+    select(buffer, barrios_nom),
+  join = st_intersects
+)
+
+# 4. Conteo único
+conteo_escuelas <- escuelas_vulbuffer %>%
+  st_drop_geometry() %>%
+  group_by(buffer, barrios_nom) %>%
+  summarise(total = n(), .groups = "drop") %>%
+  mutate(buffer = factor(buffer, levels = c("0-500m", "500-1000m", "1000-2000m"))) %>%
+  arrange(barrios_nom, buffer)
