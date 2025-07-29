@@ -94,3 +94,36 @@ barrios_vul_bloqp %>%
   count(barrios_nom, bloque) %>%
   arrange(barrios_nom, bloque)
 
+buff_cm_500  <- barrioscm_sjs_pts %>% st_buffer(500)  %>% mutate(buffer = "500m")
+buff_cm_1000 <- barrioscm_sjs_pts %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_cm_2000 <- barrioscm_sjs_pts %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+buffers_cm_bind <- bind_rows(buff_cm_500, buff_cm_1000, buff_cm_2000)
+escuelas_cm_filtro <- st_filter(educ_sna, buffers_cm_bind)
+escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_intersects)
+conteo_escuelas_cm <- escuelas_cmbuffer %>%
+  group_by(buffer, barrios_nom) %>%
+  summarise(total = n(), .groups = "drop")
+```
+
+
+```{r}
+#Trabajamos con anillos concentricos en vez de buffers
+
+# Hacemos  buffers individuales, necesarios para esta operacion
+buffer_500 <- barrioscm_fil %>% st_buffer(dist = 500)
+buffer_1000 <- barrioscm_fil %>% st_buffer(dist = 1000)
+buffer_2000 <- barrioscm_fil %>% st_buffer(dist = 2000)
+
+# Crear los anillos concéntricos
+barrioscm_anillos <- bind_rows(
+  buffer_500 %>% mutate(distancia = "0-500m"),                              # Anillo interior completo
+  st_difference(buffer_1000, buffer_500) %>% mutate(distancia = "500-1000m"),  # Solo la corona entre 500-1000m
+  st_difference(buffer_2000, buffer_1000) %>% mutate(distancia = "1000-2000m")  # Solo la corona entre 1000-2000m
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+#Hacemos los joins
+barrioscm_educ <- st_join(barrioscm_anillos, educ_sna, join = st_intersects)
+educ_barrioscm <- st_join(educ_sna, barrioscm_anillos, join = st_intersects)%>%
+  filter(!is.na(distancia))
+
