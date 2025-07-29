@@ -43,6 +43,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 
 ```
 
+#Barrios de clase media y alta de Ciudad Autonoma de Buenos Aires
 
 ```{r Carga de Mapa base Radio Censales AMBA}
 
@@ -88,13 +89,23 @@ bairescm_q <- mapa_eco %>%
 ```
 
 
+```{r}
+#Cargamos el mapa de barrios y le transformamos el crs
+barrioscm_caba <- st_read(url_barrioscaba)
+st_crs(barrioscm_caba)
+sum(!st_is_valid(barrioscm_caba))
+barrioscm_caba <- st_transform(barrioscm_caba, 5347)
+
+
+```
+
 ```{r Carga de mapa de barruis y join con radiocensales con seleccion de columnas}
-barrioscm_sjs <- st_read(url_barrioscaba) %>%
-  st_make_valid() %>%
-  st_transform(5347) %>%
-  st_join(bairescm_q, join = st_intersects) %>% #Join espacial para ubicar radio censales en barrios
-  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, #Seleccionamos columnas que nos interesan y renombramos
-         barrios_nom = nombre, comuna, perimetro_, area_metro)
+
+barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
+
+barrioscm_sjs <- barrios_cm_sj %>%
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
+  rename(barrios_nom = nombre)
 ```
 
 ```{r}
@@ -172,14 +183,180 @@ conteo_escuelas_cm <- escuelas_cmbuffer %>%
 
 
 ```{r Grafico de conteo}
+
 ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
   geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_brewer(palette = "Set2") +
+  scale_fill_manual(values = c(
+    "500m" = "#1b9e77",    
+    "1000m" = "#d95f02",   
+    "2000m" = "#7570b3"    
+  )) +
   labs(title = "Escuelas cercanas a barrios de clase media/alta",
        x = "Barrio", y = "Cantidad de escuelas", fill = "Distancia") +
   theme_minimal()
 
+
 ```
+```{r Segunda visualización: Mapa de buffers y escuelas}
+ggplot() +
+  # Mapa base
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
+  
+  # Buffers con transparencia
+  geom_sf(data = buffers_cm_bind, 
+          aes(fill = buffer), 
+          color = "red", alpha = 0.2) +
+  
+  # Escuelas dentro de los buffers
+  geom_sf(data = escuelas_cmbuffer, 
+          aes(color = tipo_gestion), 
+          size = 2) +
+ 
+  # Colores para buffers y gestión
+  scale_fill_manual(values = c("500m" = "blue", 
+                               "1000m" = "skyblue", 
+                               "2000m" = "red")) +
+  scale_color_manual(values = c("Privada" = "purple", 
+                                "Estatal" = "green")) +
+  
+  labs(title = "Escuelas dentro de buffers de radios censales",
+       subtitle = "Buffers a 500m, 1000m y 2000m - Colores por gestión",
+       fill = "Distancia",
+       color = "Gestión") +
+  
+  theme_minimal()
+
+```
+```{r Tercera visualización: Facetado de buffers y escuelas}
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
+  # Buffers
+  geom_sf(data = buffers_cm_bind, 
+          aes(fill = buffer), 
+          color = NA, alpha = 0.3) +
+  
+  # Escuelas dentro de buffers
+  geom_sf(data = escuelas_cmbuffer, 
+          aes(color = tipo_gestion), 
+          size = 1, alpha=0.1) +
+  
+  scale_fill_manual(values = c("500m" = "blue", 
+                               "1000m" = "skyblue", 
+                               "2000m" = "red")) +
+  scale_color_manual(values = c("Privada" = "purple", 
+                                "Estatal" = "green")) +
+  
+  labs(title = "Escuelas dentro de buffers de radios censales",
+       subtitle = "Facetado por barrio",
+       fill = "Distancia",
+       color = "Gestión") +
+  
+  theme_minimal() +
+  facet_wrap(~ barrios_nom)
+
+```
+```{r}
+buffers_cm_bind_wgs <- st_transform(buffers_cm_bind, 4326)
+escuelas_cmbuffer_wgs <- st_transform(escuelas_cmbuffer, 4326)
+barrioscm_filp_wgs <- st_transform(barrioscm_filp, 4326)
+
+
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  
+  # Buffers (colores por distancia)
+  addPolygons(data = buffers_cm_bind_wgs,
+              fillColor = ~case_when(
+                buffer == "500m" ~ "blue",
+                buffer == "1000m" ~ "skyblue",
+                buffer == "2000m" ~ "red"
+              ),
+              fillOpacity = 0.3,
+              color = "black",
+              weight = 1,
+              group = "Buffers") %>%
+  
+  # Escuelas (colores por gestión)
+  addCircleMarkers(data = escuelas_cmbuffer_wgs,
+                   radius = 4,
+                   color = ~case_when(
+                     tipo_gestion == "Estatal" ~ "green",
+                     tipo_gestion == "Privada" ~ "purple",
+                     TRUE ~ "gray"
+                   ),
+                   stroke = FALSE,
+                   fillOpacity = 0.7,
+                   popup = ~paste0("<b>Escuela: </b>", escuela,
+                                   "<br><b>Gestión: </b>", tipo_gestion),
+                   group = "Escuelas") %>%
+  
+  # Centroides (opcional)
+  addCircleMarkers(data = barrioscm_filp_wgs,
+                   radius = 5,
+                   color = "red",
+                   fill = TRUE,
+                   fillOpacity = 1,
+                   stroke = TRUE,
+                   weight = 1,
+                   popup = ~paste0("<b>Barrio: </b>", barrios_nom),
+                   group = "Centroides") %>%
+  
+  # Control de capas
+  addLayersControl(
+    overlayGroups = c("Buffers", "Escuelas", "Centroides"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+
+```{r}
+# 1. Filtrar escuelas dentro de cada buffer
+escuelas_cm_500 <- st_filter(educ_sna, buff_cm_500)
+escuelas_cm_1000 <- st_filter(educ_sna, buff_cm_1000)
+escuelas_cm_2000 <- st_filter(educ_sna, buff_cm_2000)
+
+# 2. Configurar OSRM en modo a pie
+options(osrm.profile = "foot")
+
+# 3. Transformar a CRS 4326
+barrioscm_filp <- st_transform(barrioscm_filp, 4326)
+escuelas_cm_500 <- st_transform(escuelas_cm_500, 4326)
+escuelas_cm_1000 <- st_transform(escuelas_cm_1000, 4326)
+escuelas_cm_2000 <- st_transform(escuelas_cm_2000, 4326)
+
+# 4. Calcular tiempos para 500m
+tabla_tiempos_cm_500 <- osrmTable(src = barrioscm_filp, dst = escuelas_cm_500)
+df_tiempos_cm_500 <- as.data.frame(tabla_tiempos_cm_500$durations)
+df_tiempos_cm_500$radio_id <- rownames(df_tiempos_cm_500)
+df_tiempos_cm_largo_500 <- df_tiempos_cm_500 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min") %>%
+  mutate(buffer = "500m")
+
+# 5. Calcular tiempos para 1000m
+tabla_tiempos_cm_1000 <- osrmTable(src = barrioscm_filp, dst = escuelas_cm_1000)
+df_tiempos_cm_1000 <- as.data.frame(tabla_tiempos_cm_1000$durations)
+df_tiempos_cm_1000$radio_id <- rownames(df_tiempos_cm_1000)
+df_tiempos_cm_largo_1000 <- df_tiempos_cm_1000 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min") %>%
+  mutate(buffer = "1000m")
+
+# 6. Calcular tiempos para 2000m
+tabla_tiempos_cm_2000 <- osrmTable(src = barrioscm_filp, dst = escuelas_cm_2000)
+df_tiempos_cm_2000 <- as.data.frame(tabla_tiempos_cm_2000$durations)
+df_tiempos_cm_2000$radio_id <- rownames(df_tiempos_cm_2000)
+df_tiempos_cm_largo_2000 <- df_tiempos_cm_2000 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min") %>%
+  mutate(buffer = "2000m")
+
+# 7. Unir resultados
+df_tiempos_cm_final <- bind_rows(df_tiempos_cm_largo_500,
+                                 df_tiempos_cm_largo_1000,
+                                 df_tiempos_cm_largo_2000)
+
+```
+
+
 ```{r Preparacion Geoconsulta}
 options(osrm.profile = "foot") #Perfil de la geconsulta, tiempo de traslado a pie.
 
@@ -215,55 +392,6 @@ df_tiempos_cm_2000 <- as.data.frame(tabla_tiempos_cm_2000$durations) %>%
 ```
 
 
-```{r Segunda Visualización: Buffers y escuelas}
-#Visualizacion
-ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
-  geom_sf(data = barrioscm_educ, aes(fill = distancia), alpha = 0.02) +
-  geom_sf(data = educ_barrioscm, aes(fill = tipo_gestion), alpha = 0.5) +
-  labs(title = "Escuelas por tipo de gestión dentro de los buffers",
-       fill = "Gestión escolar") +
-  theme_minimal()
-```
-
-
-
-
-```{r}
-p1 <- ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1)
-p2 <- p1 +
-  geom_sf(data = barrioscm_educ, aes(color = distancia), alpha = 0.01, size = 1)
-print(p2)
-```
-
-```{r}
-ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", alpha = 0.3, size = 0.1)+
-  geom_sf(data = barrioscm_educ, aes(fill = distancia), color = "violet", alpha = 0.3) +
-  geom_sf(data = educ_barrioscm, color = "blue", size = 1) +
-  labs(
-    title = "Escuelas dentro de radios de barrios de clase media y alta",
-    fill = "Radio del buffer"
-  ) +
-  theme_minimal()
-```
-
-
-```{r}
-ggplot(educ_barrios) +
-  geom_sf(data = radio_bsas, fill = "grey95", color = "white") +
-  geom_sf(aes(color = distancia), size = 1, alpha = 0.7) +
-  facet_wrap(distancia~barrios_nom) +
-  scale_color_brewer(palette = "Set2")+
-    theme_minimal() +
-  labs(
-    title = "Escuelas dentro de buffers de barrios de clase media y alta",
-    color = "Distancia al barrio"
-  )
-```
-
-
 ```{r}
 
 conteo_escuelasbarrios <- barrios_educ %>%
@@ -272,36 +400,7 @@ conteo_escuelasbarrios <- barrios_educ %>%
 ```
 
 
-```{r}
-ggplot(conteo_escuelasbarrios, aes(x = barrios_nom, y = cantidad_escuelas, fill = distancia)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(
-    title = "Cantidad de escuelas cercanas por barrio y distancia",
-    x = "Barrio",
-    y = "Cantidad de escuelas",
-    fill = "Distancia del barrio"
-  ) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-
-```{r}
-ggplot(conteo_escuelasbarrios, aes(x = distancia, y = cantidad_escuelas, fill = distancia)) +
-  geom_col() +
-  facet_wrap(~barrios_nom) +
-  labs(
-    title = "Escuelas dentro del radio de cada barrio",
-    x = "Distancia",
-    y = "Cantidad de escuelas"
-  ) +
-  theme_minimal()
-```
-
-
-
-
-
+#Barrios Populares de Ciudad Autonoma de Buenos Aires
 
 ```{r Barrios Populares}
 td <- tempdir()
@@ -481,6 +580,50 @@ ggplot(conteo_escuelasvulpun, aes(x = buffer, y = total, fill = buffer)) +
 
 
 ```{r}
+
+# 1. Filtrar escuelas dentro de cada buffer
+escuelas_500 <- st_filter(educ_sna, buff_vul_500)
+escuelas_1000 <- st_filter(educ_sna, buff_vul_1000)
+escuelas_2000 <- st_filter(educ_sna, buff_vul_2000)
+
+# 2. Configurar OSRM en modo a pie
+options(osrm.profile = "foot")
+
+# 3. Transformar todos los datos a CRS 4326 (WGS84)
+radios_vul8 <- st_transform(radios_vul8, 4326)
+escuelas_500 <- st_transform(escuelas_500, 4326)
+escuelas_1000 <- st_transform(escuelas_1000, 4326)
+escuelas_2000 <- st_transform(escuelas_2000, 4326)
+
+# 4. Calcular tiempos para 500m
+tabla_tiempos_500 <- osrmTable(src = radios_vul8, dst = escuelas_500)
+df_tiempos_500 <- as.data.frame(tabla_tiempos_500$durations)
+df_tiempos_500$radio_id <- rownames(df_tiempos_500)
+df_tiempos_largo_500 <- df_tiempos_500 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min") %>%
+  mutate(buffer = "500m")
+
+# 5. Calcular tiempos para 1000m
+tabla_tiempos_1000 <- osrmTable(src = radios_vul8, dst = escuelas_1000)
+df_tiempos_1000 <- as.data.frame(tabla_tiempos_1000$durations)
+df_tiempos_1000$radio_id <- rownames(df_tiempos_1000)
+df_tiempos_largo_1000 <- df_tiempos_1000 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min") %>%
+  mutate(buffer = "1000m")
+
+# 6. Calcular tiempos para 2000m
+tabla_tiempos_2000 <- osrmTable(src = radios_vul8, dst = escuelas_2000)
+df_tiempos_2000 <- as.data.frame(tabla_tiempos_2000$durations)
+df_tiempos_2000$radio_id <- rownames(df_tiempos_2000)
+df_tiempos_largo_2000 <- df_tiempos_2000 %>%
+  pivot_longer(cols = -radio_id, names_to = "escuela_id", values_to = "tiempo_min") %>%
+  mutate(buffer = "2000m")
+
+# 7. Unir los resultados en un único dataframe
+df_tiempos_final <- bind_rows(df_tiempos_largo_500,
+                              df_tiempos_largo_1000,
+                              df_tiempos_largo_2000)
+
 
 ```
 
