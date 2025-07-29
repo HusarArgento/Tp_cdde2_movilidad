@@ -127,3 +127,15 @@ barrioscm_educ <- st_join(barrioscm_anillos, educ_sna, join = st_intersects)
 educ_barrioscm <- st_join(educ_sna, barrioscm_anillos, join = st_intersects)%>%
   filter(!is.na(distancia))
 
+#Cargamos el mapa de barrios y le transformamos el crs
+barrioscm_caba <- st_read(url_barrioscaba)
+st_crs(barrioscm_caba)
+sum(!st_is_valid(barrioscm_caba))
+barrioscm_caba <- st_transform(barrioscm_caba, 5347)
+
+barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
+
+barrioscm_sjs <- barrios_cm_sj %>%
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
+  rename(barrios_nom = nombre)
+#rm(barrios_cm_sj)

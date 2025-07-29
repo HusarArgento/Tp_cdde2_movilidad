@@ -87,42 +87,20 @@ bairescm_q <- mapa_eco %>%
 
 ```
 
-```{r}
+
+```{r Carga de mapa de barruis y join con radiocensales con seleccion de columnas}
 barrioscm_sjs <- st_read(url_barrioscaba) %>%
   st_make_valid() %>%
   st_transform(5347) %>%
-  st_join(bairescm_q, join = st_intersects) %>%
-  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster,
+  st_join(bairescm_q, join = st_intersects) %>% #Join espacial para ubicar radio censales en barrios
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, #Seleccionamos columnas que nos interesan y renombramos
          barrios_nom = nombre, comuna, perimetro_, area_metro)
-```
-
-
-```{r}
-#Cargamos el mapa de barrios y le transformamos el crs
-barrioscm_caba <- st_read(url_barrioscaba)
-st_crs(barrioscm_caba)
-sum(!st_is_valid(barrioscm_caba))
-barrioscm_caba <- st_transform(barrioscm_caba, 5347)
-
-#Join espacial para ubicar radio censales en barrios
-barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
-
-#Seleccionamos columnas que nos interesan y renombramos
-barrioscm_sjs <- barrios_cm_sj %>% 
-  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
-  rename(barrios_nom = nombre)
-#rm(barrios_cm_sj)
 ```
 
 ```{r}
 barrioscm_sjs_simpl <- barrioscm_sjs %>%
   st_simplify(dTolerance = 50)  
-
-
-
 ```
-
-
 
 
 ```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
@@ -136,8 +114,6 @@ barrioscm_fil <- barrioscm_sjs %>%
   slice_head(n=8) %>%
   ungroup()
 #rm(barrioscm_sjs)
-
-
 ```
 
 ```{r Primera visualizacion: radiocensales elegidos de CABA  }
