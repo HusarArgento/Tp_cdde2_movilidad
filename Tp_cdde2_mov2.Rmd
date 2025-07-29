@@ -44,9 +44,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 ```
 
 
-```{r}
-#1 Carga de datos
-#1.1 Mapa base Radio Censales AMBA
+```{r Carga de Mapa base Radio Censales AMBA}
 
 td <- tempdir()
 rar_path <- path(td, "Shapes.rar")
@@ -62,13 +60,12 @@ radios2 <- st_transform(radios2, 5347)
 ```
 
 
-```{r}
-#Dataset ingreso medio AMBA (2022)
+```{r Carga Dataset ingreso medio AMBA (2022)}
+
 radio_socioeco <- read.csv(url_radiosocioeco, fileEncoding = "latin1")
 ```
 
-```{r}
-#Join Df Espacial/No Espacial: Mapa de Radio Censales e Ingresos 
+```{r Join Espacial con No espacial: Radio Censales e Ingreso}
 
 mapa_eco <- left_join(radios2, radio_socioeco, by = c("CO_FRAC_RA" = "LINK" ) ) %>%
   filter(!is.na(Remuneracion_media)) 
@@ -76,7 +73,7 @@ rm(radio_socioeco)
 ```
 
 
-```{r}
+```{r Clasificacion por de ingreso en cuartiles}
 cuartiles <- quantile(mapa_eco$Remuneracion_media, probs = c(0.25, 0.50, 0.75), na.rm = TRUE)
 bairescm_q <- mapa_eco %>%
   filter(provincia_id == 2, Remuneracion_media > 30000) %>%
@@ -121,15 +118,14 @@ barrioscm_sjs <- barrios_cm_sj %>%
 barrioscm_sjs_simpl <- barrioscm_sjs %>%
   st_simplify(dTolerance = 50)  
 
-barrioscm_sjs_pts <- barrioscm_sjs %>%
-  st_point_on_surface()
+
 
 ```
 
 
 
 
-```{r}
+```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
 #Agrupamos por barrios y filtramos los que nos interesan 
 barrioscm_fil <- barrioscm_sjs %>%
   filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
@@ -144,6 +140,23 @@ barrioscm_fil <- barrioscm_sjs %>%
 
 ```
 
+```{r Primera visualizacion: radiocensales elegidos de CABA  }
+
+#Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
+radio_bsas <-  st_read(url_radiocensalcaba)
+st_crs(radio_bsas)
+sum(!st_is_valid(radio_bsas))
+radio_bsas <- st_transform(radio_bsas, 5347)
+
+#Visualizamos
+ggplot() + 
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
+  geom_sf(data = barrioscm_fil, aes(fill = barrios_nom), color = "white", size = 0.2) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal()
+```
+
+
 
 ```{r}
 #cargamos las escuelas
@@ -157,7 +170,10 @@ rm(educ)
 ```
 
 
-```{r}
+```{r Buffers y conteo}
+barrioscm_sjs_pts <- barrioscm_sjs %>%
+  st_point_on_surface() #Trabajamos con geometria de punto para reducir el costo computacional
+
 barrioscm_filp <- barrioscm_sjs_pts %>%
   filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
            barrios_nom == "Caballito" & cluster == "Clase media alta"|
@@ -179,7 +195,7 @@ conteo_escuelas_cm <- escuelas_cmbuffer %>%
 ```
 
 
-```{r}
+```{r Grafico de conteo}
 ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_brewer(palette = "Set2") +
@@ -188,46 +204,17 @@ ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
   theme_minimal()
 
 ```
-```{r}
-ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
-  geom_col(position = "dodge") +
-  scale_fill_brewer(palette = "Set2") +
-  theme_minimal() +
-  labs(title = "Escuelas cercanas a barrios de clase media/alta",
-       x = "Barrio", y = "Cantidad de escuelas", fill = "Buffer")
+```{r Preparacion Geoconsulta}
+options(osrm.profile = "foot") #Perfil de la geconsulta, tiempo de traslado a pie.
 
-```
-
-
-```{r}
-#Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
-radio_bsas <-  st_read(url_radiocensalcaba)
-st_crs(radio_bsas)
-sum(!st_is_valid(radio_bsas))
-radio_bsas <- st_transform(radio_bsas, 5347)
-```
-
-
-
-```{r}
-#Primera visualizacion: Distribucion socio economica de caba  
-ggplot() + 
-  geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
-  geom_sf(data = barrioscm_fil, aes(fill = barrios_nom), color = "white", size = 0.2) +
-  scale_fill_brewer(palette = "Set1") +
-  theme_minimal()
-```
-```{r}
-options(osrm.profile = "foot")
-
-barrioscm_filp <- st_transform(barrioscm_filp, 4326)
+barrioscm_filp <- st_transform(barrioscm_filp, 4326) #Convertir a crs legible para OSRM
 escuelas_cm_500 <- st_transform(escuelas_cm_500, 4326)
 escuelas_cm_1000 <- st_transform(escuelas_cm_1000, 4326)
-escuelas_cm_2000 <- st_transform(escuelas_cm_2000, 4326)
+escuelas_cm_2000 <- st_transform(escuelas_cm_2000, 4326) 
 
 ```
 
-```{r}
+```{r Geoconsulta tiempos a pie }
 # 500 m
 tabla_tiempos_cm_500 <- osrmTable(src = barrioscm_filp, dst = escuelas_cm_500)
 df_tiempos_cm_500 <- as.data.frame(tabla_tiempos_cm_500$durations) %>%
@@ -252,13 +239,7 @@ df_tiempos_cm_2000 <- as.data.frame(tabla_tiempos_cm_2000$durations) %>%
 ```
 
 
-
-```{r}
-
-```
-
-
-```{r}
+```{r Segunda Visualización: Buffers y escuelas}
 #Visualizacion
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "grey80", size = 0.1) +
