@@ -183,3 +183,16 @@ radios_palermo_alta <- radios_df %>%
   educ_puntos <- educ_barrios_vul %>%
     st_cast("POINT")
   st_geometry_type(educ_puntos) %>% unique()
+
+
+  #Ordenamos y clasificamos los clusters
+
+  baires_ecorad <- mapa_eco  %>% filter(provincia_id == 2, Remuneracion_media > 30000 ) #Filtrado de CABA
+
+  bairescm_q <- baires_ecorad %>% mutate(cluster = case_when(
+    Remuneracion_media <= quantile(Remuneracion_media, 0.25, na.rm = TRUE) ~ "Clase baja",
+    Remuneracion_media <= quantile(Remuneracion_media, 0.50, na.rm = TRUE) ~ "Clase media",
+    Remuneracion_media <= quantile(Remuneracion_media, 0.75, na.rm = TRUE) ~ "Clase media alta",
+    TRUE ~ "Clase alta"
+  ))
+

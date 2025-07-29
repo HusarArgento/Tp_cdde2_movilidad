@@ -77,17 +77,26 @@ rm(radio_socioeco)
 
 
 ```{r}
-#Ordenamos y clasificamos los clusters
-
-baires_ecorad <- mapa_eco  %>% filter(provincia_id == 2, Remuneracion_media > 30000 ) #Filtrado de CABA
- 
-bairescm_q <- baires_ecorad %>% mutate(cluster = case_when( 
-  Remuneracion_media <= quantile(Remuneracion_media, 0.25, na.rm = TRUE) ~ "Clase baja",
-  Remuneracion_media <= quantile(Remuneracion_media, 0.50, na.rm = TRUE) ~ "Clase media",  
-  Remuneracion_media <= quantile(Remuneracion_media, 0.75, na.rm = TRUE) ~ "Clase media alta", 
-  TRUE ~ "Clase alta"
+cuartiles <- quantile(mapa_eco$Remuneracion_media, probs = c(0.25, 0.50, 0.75), na.rm = TRUE)
+bairescm_q <- mapa_eco %>%
+  filter(provincia_id == 2, Remuneracion_media > 30000) %>%
+  mutate(cluster = case_when(
+    Remuneracion_media <= cuartiles[1] ~ "Clase baja",
+    Remuneracion_media <= cuartiles[2] ~ "Clase media",
+    Remuneracion_media <= cuartiles[3] ~ "Clase media alta",
+    TRUE ~ "Clase alta"
   ))
 
+
+```
+
+```{r}
+barrioscm_sjs <- st_read(url_barrioscaba) %>%
+  st_make_valid() %>%
+  st_transform(5347) %>%
+  st_join(bairescm_q, join = st_intersects) %>%
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster,
+         barrios_nom = nombre, comuna, perimetro_, area_metro)
 ```
 
 
@@ -105,7 +114,16 @@ barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
 barrioscm_sjs <- barrios_cm_sj %>% 
   select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
   rename(barrios_nom = nombre)
-rm(barrios_cm_sj)
+#rm(barrios_cm_sj)
+```
+
+```{r}
+barrioscm_sjs_simpl <- barrioscm_sjs %>%
+  st_simplify(dTolerance = 50)  
+
+barrioscm_sjs_pts <- barrioscm_sjs %>%
+  st_point_on_surface()
+
 ```
 
 
@@ -121,12 +139,64 @@ barrioscm_fil <- barrioscm_sjs %>%
   arrange(desc (Remuneracion_media)) %>%
   slice_head(n=8) %>%
   ungroup()
-rm(barrioscm_sjs)
+#rm(barrioscm_sjs)
+
 
 ```
 
 
+```{r}
+#cargamos las escuelas
+educ <- st_read(url_educativos)
+sum(!st_is_valid(educ))
+educ <- st_transform(educ, 5347) %>% 
+  select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
 
+educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
+rm(educ)
+```
+
+
+```{r}
+barrioscm_filp <- barrioscm_sjs_pts %>%
+  filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
+           barrios_nom == "Caballito" & cluster == "Clase media alta"|
+           barrios_nom == "Almagro" & cluster == "Clase media" ) %>%
+  group_by(barrios_nom) %>%
+  arrange(desc (Remuneracion_media)) %>%
+  slice_head(n=8) %>%
+  ungroup()
+buff_cm_500  <- barrioscm_filp %>% st_buffer(500)  %>% mutate(buffer = "500m")
+buff_cm_1000 <- barrioscm_filp %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_cm_2000 <- barrioscm_filp %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+
+buffers_cm_bind <- bind_rows(buff_cm_500, buff_cm_1000, buff_cm_2000)
+escuelas_cm_filtro <- st_filter(educ_sna, buffers_cm_bind)
+escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_intersects)
+conteo_escuelas_cm <- escuelas_cmbuffer %>%
+  group_by(barrios_nom, buffer) %>%
+  summarise(total = n(), .groups = "drop")
+```
+
+
+```{r}
+ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Escuelas cercanas a barrios de clase media/alta",
+       x = "Barrio", y = "Cantidad de escuelas", fill = "Distancia") +
+  theme_minimal()
+
+```
+```{r}
+ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
+  geom_col(position = "dodge") +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal() +
+  labs(title = "Escuelas cercanas a barrios de clase media/alta",
+       x = "Barrio", y = "Cantidad de escuelas", fill = "Buffer")
+
+```
 
 
 ```{r}
@@ -150,6 +220,17 @@ ggplot() +
 
 
 
+```{r}
+buff_cm_500  <- barrioscm_sjs_pts %>% st_buffer(500)  %>% mutate(buffer = "500m")
+buff_cm_1000 <- barrioscm_sjs_pts %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_cm_2000 <- barrioscm_sjs_pts %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+buffers_cm_bind <- bind_rows(buff_cm_500, buff_cm_1000, buff_cm_2000)
+escuelas_cm_filtro <- st_filter(educ_sna, buffers_cm_bind)
+escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_intersects)
+conteo_escuelas_cm <- escuelas_cmbuffer %>%
+  group_by(buffer, barrios_nom) %>%
+  summarise(total = n(), .groups = "drop")
+```
 
 
 
@@ -174,14 +255,7 @@ barrioscm_anillos <- bind_rows(
 
 
 ```{r}
-#cargamos las escuelas
-educ <- st_read(url_educativos)
-sum(!st_is_valid(educ))
-educ <- st_transform(educ, 5347) %>% 
-  select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
 
-educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
-rm(educ)
 
   
 ```
