@@ -43,7 +43,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 
 ```
 
-#Barrios de clase media y alta de Ciudad Autonoma de Buenos Aires
+# 1ra Parte: Barrios de clase media y alta de Ciudad Autonoma de Buenos Aires
 
 ```{r Carga de Mapa base Radio Censales AMBA}
 
@@ -77,9 +77,9 @@ rm(radio_socioeco)
 ```{r Clasificacion por de ingreso en cuartiles}
 cuartiles <- quantile(mapa_eco$Remuneracion_media, probs = c(0.25, 0.50, 0.75), na.rm = TRUE)
 bairescm_q <- mapa_eco %>%
-  filter(provincia_id == 2, Remuneracion_media > 30000) %>%
+  filter(provincia_id == 2, Remuneracion_media > 30000) %>% #Recortamos CABA
   mutate(cluster = case_when(
-    Remuneracion_media <= cuartiles[1] ~ "Clase baja",
+    Remuneracion_media <= cuartiles[1] ~ "Clase baja",  #Dividimos el ingreso en cuartiles
     Remuneracion_media <= cuartiles[2] ~ "Clase media",
     Remuneracion_media <= cuartiles[3] ~ "Clase media alta",
     TRUE ~ "Clase alta"
@@ -99,7 +99,7 @@ barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
 ```
 
-```{r Carga de mapa de barruis y join con radiocensales con seleccion de columnas}
+```{r Join mapa de barrios y  radiocensales con seleccion de columnas}
 
 barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
 
@@ -107,12 +107,6 @@ barrioscm_sjs <- barrios_cm_sj %>%
   select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
   rename(barrios_nom = nombre)
 ```
-
-```{r}
-barrioscm_sjs_simpl <- barrioscm_sjs %>%
-  st_simplify(dTolerance = 50)  
-```
-
 
 ```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
 #Agrupamos por barrios y filtramos los que nos interesan 
@@ -145,13 +139,12 @@ ggplot() +
 
 
 
-```{r}
+```{r Carga de escuelas}
 #cargamos las escuelas
 educ <- st_read(url_educativos)
 sum(!st_is_valid(educ))
 educ <- st_transform(educ, 5347) %>% 
   select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
-
 educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
 rm(educ)
 ```
@@ -159,16 +152,8 @@ rm(educ)
 
 ```{r Buffers y conteo}
 barrioscm_sjs_pts <- barrioscm_sjs %>%
-  st_point_on_surface() #Trabajamos con geometria de punto para reducir el costo computacional
+  st_point_on_surface() #Trabajamos con geometria de punto para reducir el costo computacional de las operaciones que sigen
 
-barrioscm_filp <- barrioscm_sjs_pts %>%
-  filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
-           barrios_nom == "Caballito" & cluster == "Clase media alta"|
-           barrios_nom == "Almagro" & cluster == "Clase media" ) %>%
-  group_by(barrios_nom) %>%
-  arrange(desc (Remuneracion_media)) %>%
-  slice_head(n=8) %>%
-  ungroup()
 buff_cm_500  <- barrioscm_filp %>% st_buffer(500)  %>% mutate(buffer = "500m")
 buff_cm_1000 <- barrioscm_filp %>% st_buffer(1000) %>% mutate(buffer = "1000m")
 buff_cm_2000 <- barrioscm_filp %>% st_buffer(2000) %>% mutate(buffer = "2000m")
@@ -179,6 +164,13 @@ escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_inte
 conteo_escuelas_cm <- escuelas_cmbuffer %>%
   group_by(barrios_nom, buffer) %>%
   summarise(total = n(), .groups = "drop")
+```
+
+
+```{r}
+tabla_resumen <- table(conteo_escuelas_cm$barrios_nom, conteo_escuelas_cm$buffer)
+addmargins(tabla_resumen)
+tabla_resumen
 ```
 
 
@@ -417,13 +409,11 @@ df_tiempos_cm_2000 <- as.data.frame(tabla_tiempos_cm_2000$durations) %>%
 
 ```{r}
 
-conteo_escuelasbarrios <- barrios_educ %>%
-  group_by(barrios_nom, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
-  summarize(cantidad_escuelas = n(), .groups = "drop")
+
 ```
 
 
-#Barrios Populares de Ciudad Autonoma de Buenos Aires
+#2da Parte: Barrios Populares de Ciudad Autonoma de Buenos Aires
 
 ```{r Barrios Populares}
 td <- tempdir()
@@ -447,7 +437,7 @@ Capa que contiene el registro de los denominados barrios poulares de la Ciudad A
 Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
 
 
-```{r}
+```{r Primera visualziación: Barrios Vulnerables de CABA en Radio Censales}
 #Primera visualizacion barrios pop en radio censales
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
@@ -456,7 +446,7 @@ ggplot() +
        fill = "Comuna") +
   theme_minimal()
 ```
-```{r}
+```{r Segunda visualización: Mapa interactivo de barrios vulnerables}
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
   addPolygons(data = st_transform (comunas, 4326),
@@ -484,7 +474,7 @@ Este conjunto de datos proporciona información sobre la ubicación, perímetro 
 
 
 
-```{r Operaciones}
+```{r Selección de 3 barrios populares}
 #Hacemos el space join entre los barrios y los radiocensales, para unir solo las partes de la geometria, es decir los radiocensales, que se intersectan con los barrios populares
 radios2 <- st_transform(radios2, 5347)
 barrios_vul <- st_transform(barrios_vul, 5347)
@@ -513,11 +503,11 @@ rm(barrios_vul_rs)
 
 ```
 
-```{r}
+```{r Muestra de 8 radiocensales de los tres barrios populares elegidos}
 #Esto lo hacemos para no pagar tanto costo computacional en las oepraciones, sobre todo geoconsultas
 barrios_vul_puntos <- barrios_vul_selec %>%
   st_point_on_surface() %>%
-  select(Id, barrios_nom, CO_FRAC_RA, TIPO_ASENT,MANZANA, Superficie, geometry)  # Ajustá según tus columnas
+  select(Id, barrios_nom, CO_FRAC_RA, TIPO_ASENT,MANZANA, Superficie, geometry)  
   
 #Agrupamos y tomamos los 8 radiocensales mas extensos en superficie de cada barrio popular
 radios_vul8 <- barrios_vul_puntos %>% 
@@ -525,6 +515,11 @@ radios_vul8 <- barrios_vul_puntos %>%
   arrange(desc(Superficie)) %>% 
   slice_head(n = 8) %>%
   ungroup()
+
+
+```
+
+```{r Buffers}
 
 buff_vul_500  <- barrios_vul_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m")
 buff_vul_1000 <- barrios_vul_puntos %>% st_buffer(1000) %>% mutate(buffer = "1000m")
@@ -537,7 +532,16 @@ conteo_escuelasvulpun <- escuelas_vulbuffer %>%
   summarise(total = n())
 
 ```
+
 ```{r}
+tabla_resumen_vul <- table(conteo_escuelasvulpun$barrios_nom, conteo_escuelasvulpun$buffer)
+addmargins(tabla_resumen_vul)
+```
+
+
+
+```{r}
+
 ggplot(conteo_escuelasvulpun, aes(x = barrios_nom, y = total, fill = buffer)) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c(
@@ -835,6 +839,38 @@ df_tiempos_total_vul <- bind_rows(
   df_tiempos_largo2,
   df_tiempos_largo3
 )
+
+```
+
+
+```{r}
+df_cm <- conteo_escuelas_cm %>%
+  mutate(grupo = case_when(
+    barrios_nom == "Almagro" ~ "Clase media baja",
+    barrios_nom == "Caballito" ~ "Clase media",
+    barrios_nom == "Palermo" ~ "Clase media alta"
+  ))
+
+df_vul <- conteo_escuelasvulpun %>%
+  mutate(grupo = "Vulnerable")
+
+conteo_comparado <- bind_rows(df_cm, df_vul)
+tabla_comparativa <- table(conteo_unificado$grupo, conteo_unificado$buffer)
+addmargins(tabla_resumen_total)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data = conteo_unificado, aes(x = buffer, y = total, fill = grupo)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Cantidad de escuelas por buffer y grupo socioeconómico",
+    x = "Buffer",
+    y = "Total de escuelas",
+    fill = "Grupo socioeconómico"
+  ) +
+  theme_minimal()
 
 ```
 

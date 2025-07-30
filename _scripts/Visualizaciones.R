@@ -195,3 +195,23 @@ ggplot(conteo_escuelasvulpun, aes(x = buffer, y = total, fill = buffer)) +
     y = "Número de escuelas"
   ) +
   theme_minimal()
+
+
+library(ggplot2)
+
+# Pasar la tabla a formato data frame
+df_heatmap <- as.data.frame(tabla_resumen)
+
+# Crear heatmap
+ggplot(df_heatmap, aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(
+    title = "Escuelas por barrio y buffer",
+    x = "Buffer",
+    y = "Barrio",
+    fill = "Total escuelas"
+  ) +
+  theme_minimal()
+

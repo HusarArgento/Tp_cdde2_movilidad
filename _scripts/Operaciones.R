@@ -196,3 +196,6 @@ radios_palermo_alta <- radios_df %>%
     TRUE ~ "Clase alta"
   ))
 
+  conteo_escuelasbarrios <- barrios_educ %>%
+    group_by(barrios_nom, distancia) %>%  # reemplazá ID_barrio por la columna que identifica barrios
+    summarize(cantidad_escuelas = n(), .groups = "drop")
