@@ -10,7 +10,7 @@ radios_vul8 <- barrios_vul_puntos %>%
   slice_head(n = 8) %>%
   ungroup()
 
-buff_vul_500  <- barrios_vul_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m")
+buffcm_vul_500  <- barrios_vul_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m")
 buff_vul_1000 <- barrios_vul_puntos %>% st_buffer(1000) %>% mutate(buffer = "1000m")
 buff_vul_2000 <- barrios_vul_puntos %>% st_buffer(2000) %>% mutate(buffer = "2000m")
 buffers_vul_bind <- bind_rows(buff_vul_500, buff_vul_1000, buff_vul_2000)
@@ -121,3 +121,77 @@ conteo_escuelas <- escuelas_cmbuffer %>%
   st_drop_geometry() %>%
   group_by(barrios_nom, buffer) %>%
   summarise(total_escuelas = n(), .groups = "drop")
+
+
+
+
+```{r}
+
+#ANILLOS CONCENTRICOS DEFINITIVO
+
+barrioscm_fil <- barrioscm_sjs %>%
+  filter(
+    (barrios_nom == "Palermo" & cluster == "Clase alta") |
+      (barrios_nom == "Caballito" & cluster == "Clase media alta") |
+      (barrios_nom == "Almagro" & cluster == "Clase media")
+  ) %>%
+  group_by(barrios_nom) %>%
+  arrange(desc(Remuneracion_media)) %>%
+  ungroup()
+
+barrios_simpl_fast <- barrioscm_fil %>%
+  st_make_valid() %>%
+  st_simplify(dTolerance = 30)
+
+
+# 1. Filtrar barrio Palermo
+palermo <- barrios_simpl_fast %>% filter(barrios_nom == "Palermo")
+palermo_500 <- st_buffer(palermo, 500)
+palermo_1000 <- st_buffer(palermo, 1000)
+palermo_2000 <- st_buffer(palermo, 2000)
+
+anillos_palermo <- bind_rows(
+  palermo_500 %>% mutate(distancia = "0-500m"),
+  st_difference(palermo_1000, palermo_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(palermo_2000, palermo_1000) %>% mutate(distancia = "1000-2000m")
+)
+
+# 2. Filtrar barrio Caballito
+caballito <- barrios_simpl_fast %>% filter(barrios_nom == "Caballito")
+caballito_500 <- st_buffer(caballito, 500)
+caballito_1000 <- st_buffer(caballito, 1000)
+caballito_2000 <- st_buffer(caballito, 2000)
+
+anillos_caballito <- bind_rows(
+  caballito_500 %>% mutate(distancia = "0-500m"),
+  st_difference(caballito_1000, caballito_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(caballito_2000, caballito_1000) %>% mutate(distancia = "1000-2000m")
+)
+
+# 3. Filtrar barrio Almagro
+almagro <- barrios_simpl_fast %>% filter(barrios_nom == "Almagro")
+almagro_500 <- st_buffer(almagro, 500)
+almagro_1000 <- st_buffer(almagro, 1000)
+almagro_2000 <- st_buffer(almagro, 2000)
+
+anillos_almagro <- bind_rows(
+  almagro_500 %>% mutate(distancia = "0-500m"),
+  st_difference(almagro_1000, almagro_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(almagro_2000, almagro_1000) %>% mutate(distancia = "1000-2000m")
+)
+
+# 4. Unir todos los anillos
+barrioscm_anillos <- bind_rows(
+  anillos_palermo,
+  anillos_caballito,
+  anillos_almagro
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+#Intersectar con escuelas
+escuelascm_anillos <- st_join(
+  educ_sna,
+  barrioscm_anillos %>% select(barrios_nom, distancia),
+  join = st_intersects
+)
+

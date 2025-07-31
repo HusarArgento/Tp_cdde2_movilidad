@@ -215,3 +215,68 @@ ggplot(df_heatmap, aes(x = Var2, y = Var1, fill = Freq)) +
   ) +
   theme_minimal()
 
+
+#LEAFLEET para puntos
+buffers_cm_bind_wgs <- st_transform(buffers_cm_bind, 4326)
+escuelascm_filtradas_wgs <- st_transform(escuelascm_filtradas, 4326)
+barrioscm_fil_wgs <- st_transform(barrioscm_fil, 4326)
+
+
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  # Buffers (colores por distancia)
+  addPolygons(data = buffers_cm_bind_wgs,
+              fillColor = ~case_when(
+                buffer == "500m" ~ "blue",
+                buffer == "1000m" ~ "skyblue",
+                buffer == "2000m" ~ "red"
+              ),
+              fillOpacity = 0.1,
+              color = "black",
+              weight = 1,
+              group = "Buffers") %>%
+
+  # Escuelas (colores por gestión)
+  addCircleMarkers(data = escuelascm_filtradas_wgs,
+                   radius = 4,
+                   color = ~case_when(
+                     tipo_gestion == "Estatal" ~ "green",
+                     tipo_gestion == "Privada" ~ "purple",
+                     TRUE ~ "gray"
+                   ),
+                   stroke = FALSE,
+                   fillOpacity = 0.7,
+                   popup = ~paste0("<b>Escuela: </b>", escuela,
+                                   "<br><b>Gestión: </b>", tipo_gestion),
+                   group = "Escuelas") %>%
+
+  # Centroides (opcional)
+  addCircleMarkers(data = barrioscm_fil_wgs,
+                   radius = 5,
+                   color = "red",
+                   fill = TRUE,
+                   fillOpacity = 1,
+                   stroke = TRUE,
+                   weight = 1,
+                   popup = ~paste0("<b>Barrio: </b>", barrios_nom),
+                   group = "Centroides") %>%
+  addLegend(
+    position = "bottomright",
+    colors = c("red", "orange", "blue"),
+    labels = c("0-500m", "500-1000m", "1000-2000m"),
+    title = "Rango de distancia"
+  )%>%
+
+  # Control de capas
+  addLayersControl(
+    overlayGroups = c("Buffers", "Escuelas", "Centroides"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+ggplot(df_tiemposcm_larga_500, aes(x = radio_id, y = tiempo_min)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.6) +
+  labs(
+    title = "Distribución de tiempos a pie (500m)",
+    x = "Radio censal",
+    y = "Tiempo de viaje (minutos)"
+  ) +
+  theme_minimal()
