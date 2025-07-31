@@ -106,7 +106,7 @@ rm(barrioscm_caba)
 
 ```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
 #Agrupamos por barrios y filtramos los que nos interesan 
-barrioscm_fil <- barrioscm_sjs %>%
+barrioscm_selec <- barrioscm_sjs %>%
   filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
            barrios_nom == "Caballito" & cluster == "Clase media alta"|
            barrios_nom == "Almagro" & cluster == "Clase media" ) %>%
@@ -135,7 +135,7 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 #Visualizamos
 ggplot() + 
   geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
-  geom_sf(data = barrioscm_fil, aes(fill = barrios_nom), color = "white", size = 0.2) +
+  geom_sf(data = barrioscm_selec, aes(fill = barrios_nom), color = "white", size = 0.2) +
   scale_fill_brewer(palette = "Set1") +
   labs(
     title = "Muestra de radios censales por barrio",
@@ -164,9 +164,9 @@ rm(educ)
 
 ```{r Operaciones espaciales: Buffers y conteo de escuelas}
 
-buff_cm_500  <- barrioscm_fil %>% st_buffer(500) %>% mutate(buffer = "500m")
-buff_cm_1000 <- barrioscm_fil %>% st_buffer(1000) %>% mutate(buffer = "1000m")
-buff_cm_2000 <- barrioscm_fil %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+buff_cm_500  <- barrioscm_selec %>% st_buffer(500) %>% mutate(buffer = "500m")
+buff_cm_1000 <- barrioscm_selec %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_cm_2000 <- barrioscm_selec %>% st_buffer(2000) %>% mutate(buffer = "2000m")
 
 buffers_cm_bind <- bind_rows(buff_cm_500, buff_cm_1000, buff_cm_2000)
 
@@ -262,6 +262,8 @@ ggplot() +
   theme_minimal()
 
 ```
+
+
 ```{r}
 escuelascm_filtradas <- st_filter(educ_sna, buffers_cm_bind)
 
@@ -365,14 +367,14 @@ leaflet() %>%
 
 ```{r Geoconsulta: Preparación}
 #Para la geoconsulta trabajamos con geometria de puntos, mas liviana.
-barrioscm_puntos <- barrioscm_fil %>%
+barrioscm_puntos <- barrioscm_selec %>%
   st_point_on_surface()%>%
   select(CO_FRAC_RA, barrios_nom, cluster, Remuneracion_media, area_metro, geometry) %>%
   arrange(desc(area_metro)) 
 
 
-buffcm500_punto <- barrioscm_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m") #Rebuffereo 
-
+buffcm500_punto <- barrioscm_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m") 
+#Rebuffereo 
 
 escuelascm_500 <- st_filter(educ_sna, buffcm500_punto) 
 #Filtrado de escuelas dentro de cada buffer
