@@ -11,9 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Librerías}
 library(tidyverse)
-library(here)
 library(sf)
-library(nngeo)
 library(leaflet)
 library(fs)
 library(osmdata)
@@ -23,7 +21,6 @@ library(openrouteservice)
 
 
 ```{r Urls}
-
 
 url_barrios2 <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-desarrollo-humano-y-habitat/barrios-populares"
 
@@ -39,8 +36,6 @@ url_radiosamba <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Shapes.
 
 url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empleo-AMBA.csv"
 
-
-
 ```
 
 # 1ra Parte: Barrios de clase media y alta de Ciudad Autonoma de Buenos Aires
@@ -50,7 +45,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 td <- tempdir()
 rar_path <- path(td, "Shapes.rar")
 download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
-system(paste('"D:/PROGRAMS-HDD/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+system(paste('"C:/Program Files/WinRAR/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
 list.files(td, pattern = "\\.shp$", recursive = TRUE)
 radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
 list.files(td, recursive = TRUE)
@@ -73,7 +68,6 @@ mapa_eco <- left_join(radios2, radio_socioeco, by = c("CO_FRAC_RA" = "LINK" ) ) 
 rm(radio_socioeco)
 ```
 
-
 ```{r Clasificacion por de ingreso en cuartiles}
 cuartiles <- quantile(mapa_eco$Remuneracion_media, probs = c(0.25, 0.50, 0.75), na.rm = TRUE)
 bairescm_q <- mapa_eco %>%
@@ -84,8 +78,6 @@ bairescm_q <- mapa_eco %>%
     Remuneracion_media <= cuartiles[3] ~ "Clase media alta",
     TRUE ~ "Clase alta"
   ))
-
-
 ```
 
 
@@ -106,6 +98,9 @@ barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
 barrioscm_sjs <- barrios_cm_sj %>%
   select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
   rename(barrios_nom = nombre)
+rm(bairescm_q)
+rm(barrioscm_caba)
+
 ```
 
 ```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
@@ -137,6 +132,64 @@ ggplot() +
   theme_minimal()
 ```
 
+```{r}
+
+barrioscm_fil <- barrioscm_sjs %>%
+  filter(
+    (barrios_nom == "Palermo" & cluster == "Clase alta") |
+    (barrios_nom == "Caballito" & cluster == "Clase media alta") |
+                 (barrios_nom == "Almagro" & cluster == "Clase media")
+  ) %>%
+  group_by(barrios_nom) %>%
+  arrange(desc(Remuneracion_media)) %>%
+  ungroup()
+
+
+# 1. Filtrar barrio Palermo
+palermo <- barrioscm_fil %>% filter(barrios_nom == "Palermo")
+palermo_500 <- st_buffer(palermo, 500)
+palermo_1000 <- st_buffer(palermo, 1000)
+palermo_2000 <- st_buffer(palermo, 2000)
+
+anillos_palermo <- bind_rows(
+  palermo_500 %>% mutate(distancia = "0-500m"),
+  st_difference(palermo_1000, palermo_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(palermo_2000, palermo_1000) %>% mutate(distancia = "1000-2000m")
+)
+
+# 2. Filtrar barrio Caballito
+caballito <- barrioscm_fil %>% filter(barrios_nom == "Caballito")
+caballito_500 <- st_buffer(caballito, 500)
+caballito_1000 <- st_buffer(caballito, 1000)
+caballito_2000 <- st_buffer(caballito, 2000)
+
+anillos_caballito <- bind_rows(
+  caballito_500 %>% mutate(distancia = "0-500m"),
+  st_difference(caballito_1000, caballito_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(caballito_2000, caballito_1000) %>% mutate(distancia = "1000-2000m")
+)
+
+# 3. Filtrar barrio Almagro
+almagro <- barrioscm_fil %>% filter(barrios_nom == "Almagro")
+almagro_500 <- st_buffer(almagro, 500)
+almagro_1000 <- st_buffer(almagro, 1000)
+almagro_2000 <- st_buffer(almagro, 2000)
+
+anillos_almagro <- bind_rows(
+  almagro_500 %>% mutate(distancia = "0-500m"),
+  st_difference(almagro_1000, almagro_500) %>% mutate(distancia = "500-1000m"),
+  st_difference(almagro_2000, almagro_1000) %>% mutate(distancia = "1000-2000m")
+)
+
+# 4. Unir todos los anillos
+barrioscm_anillos <- bind_rows(
+  anillos_palermo,
+  anillos_caballito,
+  anillos_almagro
+) %>%
+  mutate(distancia = factor(distancia, levels = c("0-500m", "500-1000m", "1000-2000m")))
+
+```
 
 
 ```{r Carga de escuelas}
@@ -149,25 +202,96 @@ educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
 rm(educ)
 ```
 
+```{r}
+barrioscm_fil <- barrioscm_sjs %>%
+  filter(
+    (barrios_nom == "Palermo" & cluster == "Clase alta") |
+    (barrios_nom == "Caballito" & cluster == "Clase media alta") |
+                 (barrios_nom == "Almagro" & cluster == "Clase media")
+  ) %>%
+  group_by(barrios_nom) %>%
+  arrange(desc(Remuneracion_media)) %>%
+  ungroup()
 
-```{r Buffers y conteo}
-barrioscm_sjs_pts <- barrioscm_sjs %>%
-  st_point_on_surface() #Trabajamos con geometria de punto para reducir el costo computacional de las operaciones que sigen
-
-buff_cm_500  <- barrioscm_filp %>% st_buffer(500)  %>% mutate(buffer = "500m")
-buff_cm_1000 <- barrioscm_filp %>% st_buffer(1000) %>% mutate(buffer = "1000m")
-buff_cm_2000 <- barrioscm_filp %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+buff_cm_500  <- barrioscm_fil %>% st_buffer(500) %>% mutate(buffer = "500m")
+buff_cm_1000 <- barrioscm_fil %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_cm_2000 <- barrioscm_fil %>% st_buffer(2000) %>% mutate(buffer = "2000m")
 
 buffers_cm_bind <- bind_rows(buff_cm_500, buff_cm_1000, buff_cm_2000)
-escuelas_cm_filtro <- st_filter(educ_sna, buffers_cm_bind)
-escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_intersects)
-conteo_escuelas_cm <- escuelas_cmbuffer %>%
+
+escuelas_cmbuffer <- st_join(educ_sna, buffers_cm_bind, join = st_intersects)
+
+
+conteo_escuelas_cm <- escuelas_cmbuffer %>% 
+  filter(!is.na(barrios_nom), !is.na(buffer)) %>%
+  st_drop_geometry() %>%           # 👈 Quita geometría
+  distinct(escuela, buffer, barrios_nom) %>%
   group_by(barrios_nom, buffer) %>%
   summarise(total = n(), .groups = "drop")
+
+
+
+tabla_resumen <- conteo_escuelas_cm %>%
+  pivot_wider(
+    names_from = buffer,
+    values_from = total
+  ) %>%
+  mutate(Sum = rowSums(across(where(is.numeric))))
+print (tabla_resumen)
+
+```
+
+```{r}
+
+
+
+# Visualización lado a lado
+ggplot() +
+  geom_sf(data = buffers_solapados, aes(fill = tipo), alpha = 0.3, color = "grey50") +
+  geom_sf(data = barrios_simpl, fill = NA, color = "black", size = 1) +
+  labs(title = "Buffers solapados") +
+  theme_minimal() +
+  facet_wrap(~ "Buffers solapados") +
+  
+  geom_sf(data = anillos, aes(fill = tipo), alpha = 0.3, color = "grey50", inherit.aes = FALSE) +
+  geom_sf(data = barrios_simpl, fill = NA, color = "black", size = 1, inherit.aes = FALSE) +
+  facet_wrap(~ "Anillos concéntricos")
+
+ggplot() +
+  geom_sf(data = barrioscm_anillos, aes(fill = buffer), alpha = 0.3, color = "grey50") +
+  geom_sf(data = radio_bsas, fill = NA, color = "black", size = 0.8) +
+  geom_sf(data = educ_sna, color = "blue", size = 0.5) +
+  labs(title = "Distribución de escuelas en anillos concéntricos") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1")
+
 ```
 
 
+
+
+
 ```{r}
+
+ggplot(conteo_escuelas_cm, aes(x = buffer, y = total, fill = barrios_nom)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Cantidad de escuelas por buffer y barrio",
+    x = "Buffer",
+    y = "Total de escuelas",
+    fill = "Barrio"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2")
+
+```
+
+
+
+
+
+
+```{r Tabla }
 tabla_resumen <- table(conteo_escuelas_cm$barrios_nom, conteo_escuelas_cm$buffer)
 addmargins(tabla_resumen)
 tabla_resumen
