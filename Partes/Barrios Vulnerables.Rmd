@@ -59,11 +59,6 @@ barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
 ```{r Primera visualizacion: radiocensales elegidos de CABA  }
 
-#Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
-radio_bsas <-  st_read(url_radiocensalcaba)
-st_crs(radio_bsas)
-sum(!st_is_valid(radio_bsas))
-radio_bsas <- st_transform(radio_bsas, 5347)
 
 ```
 
@@ -77,12 +72,6 @@ educ <- st_transform(educ, 5347) %>%
   select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
 educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
 rm(educ)
-```
-
-
-
-```{r}
-
 ```
 
 
@@ -111,6 +100,13 @@ Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbaniz
 
 
 ```{r Primera visualziación: Barrios Vulnerables de CABA en Radio Censales}
+
+#Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
+radio_bsas <-  st_read(url_radiocensalcaba)
+st_crs(radio_bsas)
+sum(!st_is_valid(radio_bsas))
+radio_bsas <- st_transform(radio_bsas, 5347)
+
 #Primera visualizacion barrios pop en radio censales
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
@@ -119,6 +115,8 @@ ggplot() +
        fill = "Comuna") +
   theme_minimal()
 ```
+
+
 ```{r Segunda visualización: Mapa interactivo de barrios vulnerables}
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
@@ -170,9 +168,6 @@ rm(barrios_vul)
 rm(barrios_vul_rs)
 
 #write.csv(barrios_vul_selec, "barrios_vul_selec.csv", row.names = TRUE)
-
-
-
 
 ```
 
@@ -226,6 +221,9 @@ ggplot(conteo_escuelasvulpun, aes(x = barrios_nom, y = total, fill = buffer)) +
        x = "Barrio", y = "Cantidad de escuelas", fill = "Distancia") +
   theme_minimal()
 ```
+
+
+
 ```{r}
 ggplot(conteo_escuelasvulpun, aes(x = buffer, y = total, fill = buffer)) +
   geom_col() +
