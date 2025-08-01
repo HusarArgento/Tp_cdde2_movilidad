@@ -201,3 +201,16 @@ conteo_escuelas <- escuelas_vulbuffer %>%
   summarise(total = n(), .groups = "drop") %>%
   mutate(buffer = factor(buffer, levels = c("0-500m", "500-1000m", "1000-2000m"))) %>%
   arrange(barrios_nom, buffer)
+
+
+
+
+
+barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31","Villa 31 - Padre Mugica", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
+  mutate(NOMBRE = case_when(
+    NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 21-24" ~ "Villa_21_24"
+  ))  %>%
+  rename(barrios_nom = NOMBRE)
