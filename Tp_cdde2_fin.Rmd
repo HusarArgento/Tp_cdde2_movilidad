@@ -49,7 +49,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 
 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 #Cargamos el mapa de barrios y le transformamos el crs
 barrioscm_caba <- st_read(url_barrioscaba)
 st_crs(barrioscm_caba)
@@ -135,7 +135,7 @@ ggplot() +
 ```
 
 
-Para este trabajo tomaremos tres barrios vulnerables,  espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en  Retiro, comuna 1,  al limite de la zona noreste de la ciudad;en segundo lugar,  la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura....
+Para este trabajo tomaremos tres barrios vulnerables,  espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en  Retiro, comuna 1,  al limite de la zona noreste de la ciudad;en segundo lugar,  la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura. Tomaremos 8 radiocensales de muestra, aquellos con mayor superficie, en el caso de cada una de las villas seleccionadas . 
 
 
 
@@ -168,22 +168,16 @@ rm(barrios_vul_rs)
 
 
 ```{r}
-comunas_wgs <- st_transform (comunas, 4326)
-barrios_vul_selec_wgs <- st_transform (barrios_vul_selec,4326)
 
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
-    addPolygons(data = barrios_vul_selec_wgs,
+    addPolygons(data = st_transform (barrios_vul_selec, 4326),
               fillColor = "red",
               color = "darkred",
               weight = 1,
               fillOpacity = 0.6,
               label = ~barrios_nom)
 ```
-
-
-
-
 
 
 ```{r Muestra de 8 radiocensales de los tres barrios populares elegidos}

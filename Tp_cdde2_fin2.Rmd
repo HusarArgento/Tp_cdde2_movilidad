@@ -18,8 +18,16 @@ library(leaflet)
 library(fs)
 library(osmdata)
 library(osrm)
-library(openrouteservice)
 ```
+
+## 1. Presentación
+
+El objetivo de este informe es presentar la problemática de la accesibilidad geográfica de los barrios vulnerables de la Ciudad Autónoma de Buenos Aires al conglomerado de escuelas que conforman la oferta educativa de la ciudad. La información generada en este breve análisis intentará oficiar de insumo para la planificación de políticas públicas dirigidas a lograr una mayor inclusión socioespacial en el ámbito educativo. Para llevar a cabo esta empresa, realizaremos una comparativa, en términos de proximidad y la accesibilidad geográfica, entre de tres barrios vulnerables y tres barrios de clase media / alta de la ciudad, que oficie de diagnóstico preliminar de la situación que permita la elaboración de una propuesta de gestión pública a posteriori.
+
+## 2. Breve reseña conceptual 
+
+Tomaremos la definición de barrio utilizada por el Ministerio de Desarrollo y Hábitat del Gobierno de la Ciudad Autónoma de Buenos Aires, en tanto comunidad o conjunto habitacional, con identidad propia dentro de la ciudad, que cumple con la normativa urbanística y sanitaria vigente, presentando un tejido urbano regular y condiciones socioeconómicas estables, sin indicadores de fragilidad o riesgo social elevados. 
+En el caso de barrios vulnerables, se los considera como zonas precarias y vulnerables en materia de infraestructura habitacional, con características sociales y urbanas, generalmente vinculadas a la informalidad. Entre los mismos podemos distinguir: Villas, asentamientos precarios, barrios municipales, barrios urbanizados, y núcleos habitacionales transitorio.
 
 
 ```{r Urls}
@@ -52,7 +60,7 @@ st_crs(barrioscm_caba)
 sum(!st_is_valid(barrioscm_caba))
 barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
-
+comunas_caba <- st_read("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson")
 ```
 
 
@@ -64,18 +72,10 @@ barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
 
 
-```{r Carga de escuelas}
-#cargamos las escuelas
-educ <- st_read(url_educativos)
-sum(!st_is_valid(educ))
-educ <- st_transform(educ, 5347) %>% 
-  select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
-educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
-rm(educ)
+```
 ```
 
 
-#2da Parte: Barrios Populares de Ciudad Autonoma de Buenos Aires
 
 ```{r Barrios Populares}
 td <- tempdir()
@@ -93,11 +93,6 @@ barrios_vul <- st_transform(barrios_vul, 5347)
    
 
 ```
-#Barrios populares 
-Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
-#TIPO_ASENT		
-Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
-
 
 ```{r Primera visualziación: Barrios Vulnerables de CABA en Radio Censales}
 
@@ -110,6 +105,10 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 
 ```
 
+##3. Observaciones
+###3.1 Barrios Vulnerables de la Ciudad de Buenos Aires
+En un primer acercamiento, observamos una distribución territorial más bien periferica del conjunto habitacional, comunmente denominado como Villa Miseria; si bien el mismo tiende a concentrarse más bien en  zona sur de la ciudad -caso "Villa 21-24 Zabaleta" en la comuna de Barracas-,  en la zona norte  encontramos a la "Villa 31: Barrio Padre Carlos Mugica" en la comuna de retiro.  Por otro lado,  al posar la lente en el centro de la ciudad, encontramos asentamientos y  nucleos habitacionales tomados, cuyo caso más destacable es el de Villa Fraga, ubicada junto los terrenos ferroviarios del ferrocarril Urquiza. Si bien usualmente se la  se lo denomina como villa, por su antiguedad y precariedad en el nivel de organizacion, el asentamiento no cumple con las caracteristicas estipuladas por el Ministerio de Habitat y Desarrollo para dicha nominación, sino que se posiciona más bien en la categoría de "Asentamiento precario urbano", actualmente bajo proceso de integracion socio-urbana.
+
 
 ```{r}
 #Primera visualizacion barrios pop en radio censales
@@ -120,37 +119,7 @@ ggplot() +
        fill = "Comuna") +
   theme_minimal()
 ```
-
-
-```{r Segunda visualización: Mapa interactivo de barrios vulnerables}
-
-comunas_caba <- st_read("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson")
-
-leaflet() %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  addPolygons(data = st_transform (barrioscm_caba, 4326),
-              fillColor = "transparent",
-              color = "black",
-              weight = 1,
-              label = ~nombre)%>%
-  addPolygons(data = st_transform (barrios_vul,4326),
-              fillColor = "red",
-              color = "darkred",
-              weight = 1,
-              fillOpacity = 0.6,
-              label = ~NOMBRE)
-```
-
-
-
-#Barrios populares 
-Capa que contiene el registro de los denominados barrios poulares de la Ciudad Autonoma de Buenos Aires. Dichos barrios son considerados las zonas precarias y vulnerables.
-#TIPO_ASENT		
-Tipo de registro: Villa, Asentamiento precario, Barrio municipal, Barrio urbanizado, Conjunto habitacional, Núcleo habitacional transitorio. Son categorías definidas según el Ministerio de Desarrollo y Hábitat en Junio de 2020.
-
-#Comunas
-Este conjunto de datos proporciona información sobre la ubicación, perímetro y área de las comunas de la Ciudad de Buenos Aires, establecidas a partir de la Ley Orgánica de Comunas (Ley Nº 1777/2005). La información permite analizar la distribución territorial y la organización administrativa de la ciudad, facilitando estudios de planificación urbana y gestión pública.
-
+Para este trabajo tomaremos tres barrios vulnerables,  espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en  Retiro, comuna 1,  al limite de la zona noreste de la ciudad;en segundo lugar,  la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura. Tomaremos 8 radiocensales de muestra, aquellos con mayor superficie, en el caso de cada una de las villas seleccionadas . 
 
 
 ```{r Selección de 3 barrios populares y muestra de 8 radiocensales de cada uno}
@@ -180,6 +149,65 @@ rm(barrios_vul_rs)
 
 ```
 
+
+```{r}
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(
+    data = st_transform(barrios_vul_selec, 4326),
+    fillColor = "red",
+    color = "darkred",
+    weight = 1,
+    fillOpacity = 0.6,
+    label = ~barrios_nom
+  ) %>%
+  addControl(
+    html = "Muestra de 8 radiocensales por Barrio Seleccionado",
+    position = "topright") %>%
+  addLegend(
+    position = "bottomright",
+    title = "Barrios seleccionados",
+    colors = rep("red", length(unique(barrios_vul_selec$barrios_nom))),
+    labels = unique(barrios_vul_selec$barrios_nom),
+    opacity = 0.6
+  )
+
+```
+
+```{r Carga de escuelas, message=FALSE, warning=FALSE}
+
+educ <- st_read(url_educativos)
+sum(!st_is_valid(educ))
+educ <- st_transform(educ, 5347) %>% 
+  select(escuela = nam , tipo_gestion = ges,  nivel = nen_mde, tipo = tip, geom_edu = geometry)
+educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
+rm(educ)
+```
+
+Por otro lado, tenemos la red de escuelas de la Ciudad de Buenos Aires, la cual consta de 2764 centros educativos, presentando  un patron de concentración hacia  la zona del macro  alrededores, con una dispersión en los barrios ubicados en los márgenes, especialmente al sur.
+
+```{r}
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey95", color = "black", size = 0.1) + 
+  geom_sf( 
+    data = educ_sna, 
+    aes(color = tipo_gestion), 
+    size = 1, 
+    shape = 21,
+    stroke = 0.6) + 
+  scale_color_manual(values = c("Estatal" = "yellow", 
+                                "Privada" = "purple"))+
+  theme_minimal() +
+  labs(
+    title = "Escuelas dentro de buffers de barrios vulnerables",
+    color = "Tipo de gestión"
+  )
+```
+Centrandonos en las muestras de radiocensales pertenecientes a los tres barrios vulnerables seleccionados, como aproximación preliminar evaluamos la  proximidad geografica de los radiocensales respecto las escuelas, explorando la cantidad de establecimientos que entran en la cobertura de buffers de 500, 1000 y 2000 metros. Entre los barrios vulnerables,  en terminos de distancia geografica y cobertura destaca la Villa 15 al sur, alcanzando una cobertura de 49 escuelas, casi el doble que en el caso de la Villa 21-24 y la 31, las cuales alcanzan una cobertura de 24 y 22, respectivamente. 
+
+
+
+
 ```{r Operaciones espaciales: Bufferrs y conteo de escuelas en zonas vulnerables }
 buffvul_500  <- barriosvul_selec %>% st_buffer(500) %>% mutate(buffer = "500m")
 buffvul_1000 <- barriosvul_selec %>% st_buffer(1000) %>% mutate(buffer = "1000m")
@@ -195,13 +223,11 @@ conteo_escuelasvul <- escuelasvul_buffer %>%
   distinct(escuela, buffer, barrios_nom) %>%
   group_by(barrios_nom, buffer) %>%
   summarise(total = n(), .groups = "drop")
-print(conteo_escuelasvul)
+
 
 ```
 
-```{r}
 
-```
 
 ```{r}
 tablavul_resumen <- conteo_escuelasvul %>%
