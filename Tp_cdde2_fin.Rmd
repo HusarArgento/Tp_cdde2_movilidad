@@ -135,7 +135,7 @@ ggplot() +
 ```
 
 
-Para este trabajo tomaremos tres barrios vulnerables,  espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en  Retiro, comuna 1,  al limite de la zona noreste de la ciudad;en segundo lugar,  la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura.
+Para este trabajo tomaremos tres barrios vulnerables,  espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en  Retiro, comuna 1,  al limite de la zona noreste de la ciudad;en segundo lugar,  la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura....
 
 
 

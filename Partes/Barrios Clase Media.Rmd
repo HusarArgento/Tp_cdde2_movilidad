@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r Librerías}
+```{r Librerías, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
 library(sf)
 library(leaflet)
@@ -19,8 +19,16 @@ library(osrm)
 library(openrouteservice)
 ```
 
+## 1. Presentación
 
-```{r Urls}
+El objetivo de este informe es presentar la problemática de la accesibilidad geográfica de los barrios vulnerables de la Ciudad Autónoma de Buenos Aires al conglomerado de escuelas que conforman la oferta educativa de la ciudad. La información generada en este breve análisis intentará oficiar de insumo para la planificación de políticas públicas dirigidas a lograr una mayor inclusión socioespacial en el ámbito educativo. Para llevar a cabo esta empresa, realizaremos una comparativa, en términos de proximidad y la accesibilidad geográfica, entre de tres barrios vulnerables y tres barrios de clase media / alta de la ciudad, que oficie de diagnóstico preliminar de la situación que permita la elaboración de una propuesta de gestión pública a posteriori.
+
+## 2. Breve reseña conceptual 
+
+Tomaremos la definición de barrio utilizada por el Ministerio de Desarrollo y Hábitat del Gobierno de la Ciudad Autónoma de Buenos Aires, en tanto comunidad o conjunto habitacional, con identidad propia dentro de la ciudad, que cumple con la normativa urbanística y sanitaria vigente, presentando un tejido urbano regular y condiciones socioeconómicas estables, sin indicadores de fragilidad o riesgo social elevados. 
+En el caso de barrios vulnerables, se los considera como zonas precarias y vulnerables en materia de infraestructura habitacional, con características sociales y urbanas, generalmente vinculadas a la informalidad. Entre los mismos podemos distinguir: Villas, asentamientos precarios, barrios municipales, barrios urbanizados, y núcleos habitacionales transitorio.
+
+```{r Urls: Fuente de datos, message=FALSE}
 
 url_barrios2 <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-desarrollo-humano-y-habitat/barrios-populares"
 
@@ -38,9 +46,11 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 
 ```
 
-# 1ra Parte: Barrios de clase media y alta de Ciudad Autonoma de Buenos Aires
+ ## 3. Observaciones
+ ## 3.1 
+ 
 
-```{r Carga de Mapa base Radio Censales AMBA}
+```{r Carga de Mapa base Radio Censales AMBA, include=FALSE}
 
 td <- tempdir()
 rar_path <- path(td, "Shapes.rar")
@@ -54,7 +64,6 @@ st_crs(radios2)
 sum(!st_is_valid(radios2))
 radios2 <- st_transform(radios2, 5347)
 ```
-
 
 ```{r Carga Dataset ingreso medio AMBA (2022)}
 
@@ -80,7 +89,6 @@ bairescm_q <- mapa_eco %>%
   ))
 ```
 
-
 ```{r}
 #Cargamos el mapa de barrios y le transformamos el crs
 barrioscm_caba <- st_read(url_barrioscaba)
@@ -102,7 +110,6 @@ rm(bairescm_q)
 rm(barrioscm_caba)
 
 ```
-
 
 ```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
 #Agrupamos por barrios y filtramos los que nos interesan 
@@ -127,9 +134,6 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 
 ```
 
-
-
-
 ```{r Primera visualizacion: Radiocensales elegidos por barrio}
 
 #Visualizamos
@@ -146,11 +150,6 @@ ggplot() +
   theme_minimal()
 ```
 
-
-
-
-
-
 ```{r Carga de escuelas}
 #cargamos las escuelas
 educ <- st_read(url_educativos)
@@ -160,7 +159,6 @@ educ <- st_transform(educ, 5347) %>%
 educ_sna <- educ %>% filter(!is.na(tipo_gestion)) #sacamos los na
 rm(educ)
 ```
-
 
 ```{r Operaciones espaciales: Buffers y conteo de escuelas}
 
@@ -192,7 +190,6 @@ tabla_resumen <- conteo_escuelas_cm %>%
 print (tabla_resumen)
 ```
 
-
 ```{r Segunda visualización: Grafico de conteo}
 
 ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
@@ -209,7 +206,6 @@ ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
 
 ```
 
-
 ```{r Tercera visualizacion: Grafico de conteo 2}
 ggplot(conteo_escuelas_cm, aes(x = reorder (buffer, total), y = total, fill = buffer)) +
   geom_col() +
@@ -224,8 +220,6 @@ ggplot(conteo_escuelas_cm, aes(x = reorder (buffer, total), y = total, fill = bu
   scale_fill_brewer(palette = "Set2")
 
 ```
-
-
 
 ```{r Cuarta visualización: Mapa de buffers y escuelas}
 
@@ -263,7 +257,6 @@ ggplot() +
 
 ```
 
-
 ```{r}
 escuelascm_filtradas <- st_filter(educ_sna, buffers_cm_bind)
 
@@ -282,10 +275,6 @@ ggplot() +
   theme_minimal()
 
 ```
-
-
-
-
 
 ```{r Quinta visualización: Facetado de buffers y escuelas}
 
@@ -316,7 +305,6 @@ ggplot() +
 
 
 ```
-
 
 ```{r Sexta visualización: Interactiva}
 
@@ -364,7 +352,6 @@ leaflet() %>%
 
 ```
 
-
 ```{r Geoconsulta: Preparación}
 #Para la geoconsulta trabajamos con geometria de puntos, mas liviana.
 barrioscm_puntos <- barrioscm_selec %>%
@@ -382,7 +369,6 @@ escuelascm_500 <- st_filter(educ_sna, buffcm500_punto)
 
 
 ```
-
 
 ```{r Geoconsulta: Osrm}
 
@@ -426,9 +412,3 @@ ggplot(df_resumen, aes(x = reorder(radio_id, tiempo_promedio), y = tiempo_promed
   theme_minimal()
 
 ```
-
-
-
-
-
-
