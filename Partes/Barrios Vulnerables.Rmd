@@ -238,7 +238,8 @@ buff_vul_1000 <- barrios_vul_puntos %>% st_buffer(1000) %>% mutate(buffer = "100
 buff_vul_2000 <- barrios_vul_puntos %>% st_buffer(2000) %>% mutate(buffer = "2000m")
 buffers_vul_bind <- bind_rows(buff_vul_500, buff_vul_1000, buff_vul_2000)
 escuelas_vul_filto <- st_filter(educ_sna, buffers_vul_bind)
-escuelas_vulbuffer <- st_join(escuelas_vul_filto, buffers_vul_bind, join = st_intersects)
+escuelas_vulbuffer <- st_join(escuelas_vul_filto, buffers_vul_bind, join = st_intersects) %>%
+  filter(!is.na (tipo_gestion))
 conteo_escuelasvulpun <- escuelas_vulbuffer %>%
   group_by(escuela, buffer, barrios_nom) %>%
   summarise(total = n())
@@ -265,6 +266,18 @@ ggplot(conteo_escuelasvul, aes(x = barrios_nom, y = total, fill = buffer)) +
        x = "Barrio", y = "Cantidad de escuelas", fill = "Distancia") +
   theme_minimal()
 ```
+
+```{r}
+ggplot(escuelasvul_buffer, aes(x = barrios_nom, fill = tipo_gestion)) +
+  geom_bar( position = "dodge") +
+  scale_fill_manual(values = c(
+    "Estatal" = "#1b9e77",    
+    "Privada" = "#d95f02" )) +
+  labs(title = "Escuelas cercanas a barrios de clase media/alta",
+       x = "Barrio", y = "Cantidad de escuelas", fill = "tipo_gestion (Gestion)") +
+  theme_minimal()
+```
+
 
 
 

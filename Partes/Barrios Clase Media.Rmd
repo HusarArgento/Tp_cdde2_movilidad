@@ -88,6 +88,8 @@ st_crs(barrioscm_caba)
 sum(!st_is_valid(barrioscm_caba))
 barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
+barrioscm_gg <- barrioscm_caba %>% filter(nombre %in% c("Almagro", "Caballito", "Palermo"))
+
 
 ```
 
@@ -101,6 +103,16 @@ barrioscm_sjs <- barrios_cm_sj %>%
 rm(bairescm_q)
 rm(barrioscm_caba)
 
+```
+
+```{r}
+ggplot() + 
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
+  geom_sf(data = barrioscm_gg, aes(fill = nombre, alpha = 0.2), color = "white", size = 0.2) +
+  scale_fill_manual (values = c("Almagro" = "red", 
+                                "Caballito" = "green",
+                                "Palermo" = "blue")) +
+  labs(title = "Selección de barrios de Clase Media/Alta")
 ```
 
 
@@ -127,6 +139,20 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 
 ```
 
+```{r}
+ggplot() + 
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
+  geom_sf(data = barrioscm_selec, aes(fill = barrios_nom), color = "white", size = 0.2) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    title = "Muestra de radios censales por barrio",
+    subtitle = "8 Radios censales por barrio elegido",
+    fill = "barrios_nom (Barrios)",
+    color = "black"
+  ) +
+  theme_minimal()
+```
+```
 
 
 
@@ -208,6 +234,19 @@ ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
 
 
 ```
+
+```{r visualizacion cantidad de escuelas publicas y privadas}
+ggplot(escuelas_cmbuffer, aes(x = barrios_nom, fill = tipo_gestion)) +
+  geom_bar( position = "dodge") +
+  scale_fill_manual(values = c(
+    "Estatal" = "#1b9e77",    
+    "Privada" = "#d95f02" )) +
+  labs(title = "Escuelas cercanas a barrios de clase media/alta",
+       x = "Barrio", y = "Cantidad de escuelas", fill = "tipo_gestion (Gestion)") +
+  theme_minimal()
+
+```
+
 
 
 ```{r Tercera visualizacion: Grafico de conteo 2}
