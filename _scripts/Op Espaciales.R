@@ -201,3 +201,34 @@ conteo_escuelas <- escuelas_vulbuffer %>%
   summarise(total = n(), .groups = "drop") %>%
   mutate(buffer = factor(buffer, levels = c("0-500m", "500-1000m", "1000-2000m"))) %>%
   arrange(barrios_nom, buffer)
+
+
+
+
+
+barrios_vul_selec <- barrios_vul_rs %>% filter(NOMBRE %in% c("Villa 31","Villa 31 - Padre Mugica", "Villa 21-24", "Villa 15 - Ciudad Oculta")) %>%
+  mutate(NOMBRE = case_when(
+    NOMBRE == "Villa 15 - Ciudad Oculta" ~ "Villa_15",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 31 - Padre Mugica" ~ "Villa_31",
+    NOMBRE == "Villa 21-24" ~ "Villa_21_24"
+  ))  %>%
+  rename(barrios_nom = NOMBRE)
+
+
+#Para visualizar no lo podemos hacer por puntos dado que queda muy superpuesto, hay que bufferear de vuelta
+
+radios_union <- barrios_vul_selec %>%
+  group_by(barrios_nom) %>%
+  summarise(geometry = st_union(geometry))
+buff_500  <- st_buffer(radios_union, 500) %>% mutate(buffer = "0-500m")
+buff_1000 <- st_buffer(radios_union, 1000) %>% mutate(buffer = "0-1000m")
+buff_2000 <- st_buffer(radios_union, 2000) %>% mutate(buffer = "0-2000m")
+anillos2 <- bind_rows(
+  buff_500,
+  st_difference(buff_1000, buff_500) %>% mutate(buffer = "500-1000m"),
+  st_difference(buff_2000, buff_1000) %>% mutate(buffer = "1000-2000m")
+)
+escuelas_cm_filtro <- st_filter(educ_sna, anillos2)
+escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_intersects)
+
