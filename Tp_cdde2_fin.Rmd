@@ -9,9 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r Librerías}
+```{r Librerías, message=FALSE, warning=FALSE}
 library(tidyverse)
-library(here)
 library(sf)
 library(nngeo)
 library(leaflet)
@@ -56,7 +55,6 @@ st_crs(barrioscm_caba)
 sum(!st_is_valid(barrioscm_caba))
 barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
-
 ```
 
 
@@ -66,7 +64,7 @@ barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 
 
 
-```{r Carga de Barrios Populares}
+```{r Carga de Barrios Populares, message=FALSE, warning=FALSE}
 td <- tempdir()
   download.file(url = paste(url_barrios2,
                             "barrios-populares-badata.zip",

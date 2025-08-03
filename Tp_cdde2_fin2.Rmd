@@ -11,7 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Librerías}
 library(tidyverse)
-library(here)
 library(sf)
 library(nngeo)
 library(leaflet)
@@ -63,20 +62,6 @@ barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 comunas_caba <- st_read("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson")
 ```
 
-
-
-```{r Primera visualizacion: radiocensales elegidos de CABA  }
-
-
-```
-
-
-
-```
-```
-
-
-
 ```{r Barrios Populares}
 td <- tempdir()
   download.file(url = paste(url_barrios2,
@@ -94,7 +79,7 @@ barrios_vul <- st_transform(barrios_vul, 5347)
 
 ```
 
-```{r Primera visualziación: Barrios Vulnerables de CABA en Radio Censales}
+```{r Primera visualziación: Barrios Vulnerables de CABA en Radio Censales, message=FALSE, warning=FALSE}
 
 #Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
 radio_bsas <-  st_read(url_radiocensalcaba)
@@ -119,10 +104,12 @@ ggplot() +
        fill = "Comuna") +
   theme_minimal()
 ```
+
 Para este trabajo tomaremos tres barrios vulnerables,  espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en  Retiro, comuna 1,  al limite de la zona noreste de la ciudad;en segundo lugar,  la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura. Tomaremos 8 radiocensales de muestra, aquellos con mayor superficie, en el caso de cada una de las villas seleccionadas . 
 
 
 ```{r Selección de 3 barrios populares y muestra de 8 radiocensales de cada uno}
+
 #Hacemos el space join entre los barrios y los radiocensales, para unir solo las partes de la geometria, es decir los radiocensales, que se intersectan con los barrios populares
 radios2 <- st_transform(radios2, 5347)
 barrios_vul <- st_transform(barrios_vul, 5347)
@@ -151,10 +138,11 @@ rm(barrios_vul_rs)
 
 
 ```{r}
+
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
   addPolygons(
-    data = st_transform(barrios_vul_selec, 4326),
+    data = st_transform(barriosvul_selec, 4326),
     fillColor = "red",
     color = "darkred",
     weight = 1,
@@ -163,16 +151,20 @@ leaflet() %>%
   ) %>%
   addControl(
     html = "Muestra de 8 radiocensales por Barrio Seleccionado",
-    position = "topright") %>%
+    position = "topright"
+  ) %>%
   addLegend(
     position = "bottomright",
     title = "Barrios seleccionados",
-    colors = rep("red", length(unique(barrios_vul_selec$barrios_nom))),
-    labels = unique(barrios_vul_selec$barrios_nom),
+    colors = rep("red", length(unique(barriosvul_selec$barrios_nom))),
+    labels = unique(barriosvul_selec$barrios_nom),
     opacity = 0.6
   )
 
+
 ```
+
+
 
 ```{r Carga de escuelas, message=FALSE, warning=FALSE}
 
