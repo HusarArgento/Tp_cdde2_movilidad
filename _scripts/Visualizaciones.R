@@ -280,3 +280,19 @@ ggplot(df_tiemposcm_larga_500, aes(x = radio_id, y = tiempo_min)) +
     y = "Tiempo de viaje (minutos)"
   ) +
   theme_minimal()
+
+
+escuelasvul_filtradas <- st_filter(educ_sna, buffersvul_bind)
+ggplot() +
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
+  geom_sf(data = buffersvul_bind, aes(fill = buffer), color = "red", alpha = 0.2) +
+  geom_sf(data = escuelasvul_filtradas, aes(color = tipo_gestion), size = 2) +
+  scale_fill_manual(values = c("500m" = "blue", "1000m" = "skyblue", "2000m" = "red")) +
+  scale_color_manual(values = c("Privada" = "purple", "Estatal" = "green")) +
+  labs(
+    title = "Escuelas dentro de buffers de radios censales",
+    subtitle = "Buffers a 500m, 1000m y 2000m - Colores por gestión",
+    fill = "Distancia",
+    color = "Gestión"
+  ) +
+  theme_minimal()

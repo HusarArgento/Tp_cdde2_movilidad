@@ -232,3 +232,38 @@ anillos2 <- bind_rows(
 escuelas_cm_filtro <- st_filter(educ_sna, anillos2)
 escuelas_cmbuffer <- st_join(escuelas_cm_filtro, buffers_cm_bind, join = st_intersects)
 
+
+```{r Buffers}
+
+buff_vul_500  <- barrios_vul_puntos %>% st_buffer(500)  %>% mutate(buffer = "500m")
+buff_vul_1000 <- barrios_vul_puntos %>% st_buffer(1000) %>% mutate(buffer = "1000m")
+buff_vul_2000 <- barrios_vul_puntos %>% st_buffer(2000) %>% mutate(buffer = "2000m")
+buffers_vul_bind <- bind_rows(buff_vul_500, buff_vul_1000, buff_vul_2000)
+escuelas_vul_filto <- st_filter(educ_sna, buffers_vul_bind)
+escuelas_vulbuffer <- st_join(escuelas_vul_filto, buffers_vul_bind, join = st_intersects) %>%
+  filter(!is.na (tipo_gestion))
+conteo_escuelasvulpun <- escuelas_vulbuffer %>%
+  group_by(escuela, buffer, barrios_nom) %>%
+  summarise(total = n())
+
+```
+
+```{r}
+tabla_resumen_vul <- table(conteo_escuelasvulpun$barrios_nom, conteo_escuelasvulpun$buffer)
+addmargins(tabla_resumen_vul)
+```
+
+```{r Geoconsulta: Preparación}
+
+
+#Agrupamos y tomamos los 8 radiocensales mas extensos en superficie de cada barrio popular
+radios_vul8 <- barrios_vul_puntos %>%
+  group_by(barrios_nom) %>%
+  arrange(desc(Superficie)) %>%
+  slice_head(n = 8) %>%
+  ungroup()
+
+
+```
+
+

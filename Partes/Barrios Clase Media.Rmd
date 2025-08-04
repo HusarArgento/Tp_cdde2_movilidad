@@ -150,8 +150,7 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 
 ```
 
-<<<<<<< HEAD
-=======
+
 ```{r}
 ggplot() + 
   geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
