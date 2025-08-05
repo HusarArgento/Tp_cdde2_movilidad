@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r Librerías}
+```{r Librerías, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(sf)
 library(nngeo)
@@ -48,7 +48,7 @@ url_radiosocioeco <- "https://cdn.produccion.gob.ar/cdn-cep/amba-aportantes/Empl
 
 ```
 
-```{r Carga nominación de Barrios de la Ciudad, message=FALSE, warning=FALSE}
+```{r Carga nominación de Barrios de la Ciudad, message=FALSE, warning=FALSE, results = 'hide'}
 #Cargamos el mapa de barrios y le transformamos el crs
 barrioscm_caba <- st_read(url_barrioscaba)
 st_crs(barrioscm_caba)
@@ -58,7 +58,7 @@ barrioscm_caba <- st_transform(barrioscm_caba, 5347)
 comunas_caba <- st_read("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/comunas/comunas.geojson")
 ```
 
-```{r Carga de Barrios Vulnerables, message=FALSE, warning=FALSE}
+```{r Carga de Barrios Vulnerables, message=FALSE, warning=FALSE, results = 'hide'}
 td <- tempdir()
   download.file(url = paste(url_barrios2,
                             "barrios-populares-badata.zip",
@@ -92,7 +92,7 @@ radio_bsas <- st_transform(radio_bsas, 5347)
 
 En un primer acercamiento, observamos una distribución territorial más bien periferica del conjunto habitacional, comunmente denominado como Villa Miseria; si bien el mismo tiende a concentrarse más bien en zona sur de la ciudad -caso "Villa 21-24 Zabaleta" en la comuna de Barracas-, en la zona norte encontramos a la "Villa 31: Barrio Padre Carlos Mugica" en la comuna de retiro. Por otro lado, al posar la lente en el centro de la ciudad, encontramos asentamientos y nucleos habitacionales tomados, cuyo caso más destacable es el de Villa Fraga, ubicada junto los terrenos ferroviarios del ferrocarril Urquiza. Si bien usualmente se la se lo denomina como villa, por su antiguedad y precariedad en el nivel de organizacion, el asentamiento no cumple con las caracteristicas estipuladas por el Ministerio de Habitat y Desarrollo para dicha nominación, sino que se posiciona más bien en la categoría de "Asentamiento precario urbano", actualmente bajo proceso de integracion socio-urbana.
 
-```{r Primera visualización: Barrios vulnerables de la Ciudad, echo=TRUE}
+```{r Visualizaciones1: Barrios vulnerables de la Ciudad, echo=TRUE}
 #Primera visualizacion barrios pop en radio censales
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +
@@ -104,7 +104,22 @@ ggplot() +
 
 Para este trabajo tomaremos tres barrios vulnerables, espacialmente distantes entre sí, los cuales cumplen con la denominación de villa. Se trata de la Villa 31: Barrio Padre Carlos Mugica , ubicado en Retiro, comuna 1, al limite de la zona noreste de la ciudad;en segundo lugar, la Villa 21-24: Barrio Zavaleta, ubicada en el linde sureste de la ciudad, entre los barrios de Barracas y Pompeya, dentro de la Comuna 4; finalmente la Villa 15: Barrio General Belgrano, usualmente nominada como "Ciudad Oculta" en Villa Lugano, comuna 8. Las tres, por su antiguedad, extension y niveles de organización cumplen con el concepto de Villa, en tanto conjunto extenso y estable de nucleos habitacionales respectivos, precarios y vulnerables a nivel de infraestructura. Tomaremos 8 radiocensales de muestra, aquellos con mayor superficie, en el caso de cada una de las villas seleccionadas .
 
-```{r Selección de 3 barrios populares y muestra de 8 radiocensales de cada uno, message=FALSE, warning=FALSE}
+```{r Carga de Mapa base Radio Censales AMBA, include=FALSE, results = 'hide'}
+td <- tempdir()
+rar_path <- path(td, "Shapes.rar")
+download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
+system(paste('"D:/PROGRAMS-HDD/Winrar/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
+list.files(td, pattern = "\\.shp$", recursive = TRUE)
+radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
+list.files(td, recursive = TRUE)
+rm(td)
+st_crs(radios2)
+sum(!st_is_valid(radios2))
+radios2 <- st_transform(radios2, 5347)
+
+```
+
+```{r Selección de 3 barrios populares y muestra de 8 radiocensales de cada uno, message=FALSE, warning=FALSE, results = 'hide'}
 
 #Hacemos el space join entre los barrios y los radiocensales, para unir solo las partes de la geometria, es decir los radiocensales, que se intersectan con los barrios populares
 radios2 <- st_transform(radios2, 5347)
@@ -132,7 +147,7 @@ rm(barrios_vul_rs)
 
 ```
 
-```{r Segunda visualización:  Muestra de 8 Radiocensales, echo=TRUE}
+```{r Visualizaciónes2:  Muestra de 8 Radiocensales, echo=TRUE}
 
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
@@ -159,7 +174,7 @@ leaflet() %>%
 
 ```
 
-```{r Carga de escuelas, message=FALSE, warning=FALSE}
+```{r Carga de escuelas, message=FALSE, warning=FALSE, results = 'hide'}
 
 educ <- st_read(url_educativos)
 sum(!st_is_valid(educ))
@@ -171,7 +186,7 @@ rm(educ)
 
 Por otro lado, tenemos la red de escuelas de la Ciudad de Buenos Aires, la cual consta de 2764 centros educativos, presentando un patron de concentración hacia la zona del macro alrededores, con una dispersión en los barrios ubicados en los márgenes, especialmente al sur.
 
-```{r Tercera visualización: Radio de cobertura de escuelas vulnerables , echo=TRUE}
+```{r Visualizaciones3: Radio de cobertura de escuelas vulnerables , echo=TRUE}
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "black", size = 0.1) + 
   geom_sf( 
@@ -189,7 +204,7 @@ ggplot() +
   )
 ```
 
-```{r Operaciones espaciales: Bufferrs y conteo de escuelas en zonas vulnerables }
+```{r Operaciones espaciales: Bufferrs y conteo de escuelas en zonas vulnerables, results = 'hide' }
 
 buffvul_500  <- barriosvul_selec %>% st_buffer(500) %>% mutate(buffer = "500m")
 buffvul_1000 <- barriosvul_selec %>% st_buffer(1000) %>% mutate(buffer = "1000m")
@@ -212,7 +227,7 @@ conteo_escuelasvul <- escuelasvul_buffer %>%
 
 Centrandonos en las muestras de radiocensales pertenecientes a los tres barrios vulnerables seleccionados, como aproximación preliminar evaluamos la proximidad geografica de los radiocensales respecto las escuelas, explorando la cantidad de establecimientos que entran en la cobertura de buffers de 500, 1000 y 2000 metros. Entre los barrios vulnerables, en terminos de distancia geografica cabe destacar el caso de la Villa 15 al sur en el radio de cobertura de 500 metros, alcanzando una abarcar un total de 49 escuelas, casi el doble que en el caso de la Villa 21-24 y la 31, las cuales alcanzan una cobertura de 24 y 22, respectivamente. Dicha diferencia se atempera respecto de la Villa 21-24 en el radio de cobertura 1000 metros, evidenciando una diferencia de 13 escuelas mientras que en el caso de la Villa 31, se mantiene un margen de 29 escuelas de diferencia. En el radio de cobertura de 2000 metros, las diferencias en terminos de cantidad se reducen bastante más siendo en ambos casos, (Villa 21-24 y Villa 31) de menos de 10 escuelas
 
-```{r Tabla cantidad de escuelas en barrios vulnerables, echo=TRUE}
+```{r Tabla cantidad de escuelas en barrios vulnerables, echo=TRUE, }
 tablavul_resumen <- conteo_escuelasvul %>%
   pivot_wider(
     names_from = buffer,
@@ -222,7 +237,7 @@ tablavul_resumen <- conteo_escuelasvul %>%
 print (tablavul_resumen)
 ```
 
-```{r Graficos: Conteo de escuelas por radio de cobertura, echo=TRUE}
+```{r Graficos 1: Conteo de escuelas por radio de cobertura, echo=TRUE, }
 ggplot(conteo_escuelasvul, aes(x = barrios_nom, y = total, fill = buffer)) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c(
@@ -252,7 +267,7 @@ tablavul_ges <- conteovul_ges %>%
 print (tablavul_ges)
 ```
 
-```{r Graficos: Escuelas en radios de cobertura por gestión}
+```{r Graficos2: Escuelas en radios de cobertura por gestión}
 ggplot(escuelasvul_buffer, aes(x = barrios_nom, fill = tipo_gestion)) +
   geom_bar( position = "dodge") +
   scale_fill_manual(values = c(
@@ -265,10 +280,9 @@ ggplot(escuelasvul_buffer, aes(x = barrios_nom, fill = tipo_gestion)) +
 
 Otra diferencia, se observa respecto del tipo de gestion, resultando particularmente notoria en los casos sur, es decir Villa 15 y Villa 21_24, registrandose una diferencia de mas del tiple de escuelas de gestion publica respecto de la privada. Cabe destacar que la situación difiere de manera contundente en el caso de la zona norta de Retiro con una diferencia de 9 escuelas unicamente. Coincidimos con Di Virgilio (20..), respecto de la concentración de escuelas de gestión privada, desde el centro hacia el norte, principalmente.
 
-```{r Cuarta Visualización: Buffers y escuelas de barrios vulnerables}
+```{r Visualizaciones4: Buffers y escuelas de barrios vulnerables}
+escuelasvul_filtradas <- st_filter(educ_sna, buffersvul_bind)
 
-buffersvul_bind$buffer <- factor(buffersvul_bind$buffer, 
-                                 levels = c("500m", "1000m", "2000m"))
 
 ggplot() +
   geom_sf(data = radio_bsas, fill = "grey95", color = "black", size = 0.1) +
@@ -277,7 +291,7 @@ ggplot() +
     aes(fill = buffer),
     color = "red",alpha = 0.05) +
   geom_sf(
-    data = escuelasvul_buffer, 
+    data = escuelasvul_filtradas, 
     aes(color = tipo_gestion), 
     size = 2) +
   scale_fill_manual(
@@ -289,42 +303,43 @@ ggplot() +
   theme_minimal() +
   labs(
     title = "Escuelas vulnerables en buffers de radioscensales de cobertura ",
-    subtitle = "Radio de cobertura a 500m, 1000m y 2000m - Colores por gestión",
+    subtitle = "Radio de cobertura a 500m, 1000m y 2000m - Colores por gestion",
     fill = "Rango de distancia",
-    color = "Tipo de gestión"
+    color = "Tipo de gestion"
   )
 
 
 ```
 
-```{r}
+```{r Visualizaciones5: Facetado}
+
 ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) + #Mapa fondo
-  geom_sf(data = buffersvul_bind, aes(color = buffer), fill = NA, size = 2) + #Buffers
-  geom_sf(data = escuelasvul_filtradas, aes(fill = tipo_gestion), #Escueas en cobertura 
-          color = "black", size = 1, shape = 21, alpha = 0.6) + 
-  scale_color_manual( #color de bordes buffers
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) +  # Mapa fondo
+  geom_sf(data = buffersvul_bind, aes(color = buffer), fill = NA, size = 2) +  # Buffers
+  # Escuelas en cobertura
+  geom_sf(data = escuelasvul_buffer, aes(fill = tipo_gestion),
+          color = "black", size = 1, shape = 21, alpha = 0.6) +
+  scale_color_manual( 
     values = c("500m" = "red", 
                "1000m" = "blue", 
                "2000m" = "green")
   ) +
-  scale_fill_manual(    # Color de puntos de escuela
+  scale_fill_manual(
     values = c("Privada" = "purple", 
                "Estatal" = "yellow")
   ) +
-  
   labs(
     title = "Escuelas vulnerables en radios de cobertura",
     subtitle = "Facetado por barrio vulnerable",
     color = "Cobertura (Buffer)",
     fill = "Tipo de gestión"
   ) +
-  
   theme_minimal() +
   facet_wrap(~ barrios_nom)
+
 ```
 
-```{r Quinta visualizacion: Interactividad}
+```{r Visualizaciones6: Interactividad}
 leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
   
@@ -382,8 +397,7 @@ leaflet() %>%
 
 ```
 
-
-```{r Geoconsulta: Preparacion}
+```{r Geoconsulta1: Preparacion}
 # Pasamos los barrios vulnerables a geometría de puntos (centroide o punto interno)
 barriosvul_puntos <- barriosvul_selec %>%
   st_point_on_surface() %>%
@@ -408,7 +422,7 @@ escuelasvul_500_wgs <- st_transform(escuelasvul_500, 4326)
 
 En la siguiente tabla podemos ver una minima de 10 segundos, una media de 13 minutos y medio, y una maxima de 28.10 minutos, siendo la mediana 16 minutos exactos. Con lo cual, para escuelas de a 500 metros (5 cuadras se puede llegar a tardar por lo general alrededor de 16 minutos)
 
-```{r}
+```{r Geoconsulta2: Osrm}
 tabla_tiemposvul_500 <- osrmTable(src = barriosvul_puntos_wgs, dst = escuelasvul_500)
 df_tiemposvul_500 <- as.data.frame(tabla_tiemposvul_500$durations)
 df_tiemposvul_500$radio_id <- rownames(df_tiemposvul_500)
@@ -422,7 +436,7 @@ df_tiemposvul_larga_500 <- df_tiemposvul_500 %>%
 summary(df_tiemposvul_larga_500$tiempo_min)
 ```
 
-```{r}
+```{r Operaciones de datos2: Tabla}
 # Agrupamos por radio censal y sacamos la media para graficar
 df_tiemposvul_media <- df_tiemposvul_larga_500 %>%
   group_by(radio_id) %>%
@@ -435,7 +449,7 @@ print(df_tiemposvul_media)
 
 Aqui tenemos el tiempo promedio para llegar a las escuelas en un radio de cobertura de 500 metros, por radiocensal el cual varia entre 11 y 17 minutos.
 
-```{r Graficos: Promedio de tiempo de viaje a pie por radiocensa}
+```{r Graficos3: Promedio de tiempo de viaje a pie por radiocensa}
 ggplot(df_tiemposvul_media, aes(x = reorder(radio_id, tiempo_min), y = tiempo_min)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
@@ -451,36 +465,20 @@ ggplot(df_tiemposvul_media, aes(x = reorder(radio_id, tiempo_min), y = tiempo_mi
 
 ### 4.1 Observaciones
 
-```{r Carga de Mapa base Radio Censales AMBA, include=FALSE}
-
-td <- tempdir()
-rar_path <- path(td, "Shapes.rar")
-download.file(url = url_radiosamba, destfile = rar_path, mode = "wb")
-system(paste('"D:/PROGRAMS-HDD/Winrar/WinRAR.exe" x', shQuote(rar_path), shQuote(td)))
-list.files(td, pattern = "\\.shp$", recursive = TRUE)
-radios2 <- read_sf(path(td, "Shapes", "Shape AMBA.shp"))
-list.files(td, recursive = TRUE)
-rm(td)
-st_crs(radios2)
-sum(!st_is_valid(radios2))
-radios2 <- st_transform(radios2, 5347)
-
-```
-
 ```{r Carga Dataset ingreso medio AMBA (INDEC)}
 
 radio_socioeco <- read.csv(url_radiosocioeco, fileEncoding = "latin1")
 
 ```
 
-```{r Join Espacial con No espacial: Radio Censales e Ingreso}
+```{r Operaciones espaciales2: Join Espacial con No espacial: Radio Censales e Ingreso}
 mapa_eco <- left_join(radios2, radio_socioeco, by = c("CO_FRAC_RA" = "LINK" ) ) %>%
   filter(!is.na(Remuneracion_media)) 
 rm(radio_socioeco)
 
 ```
 
-```{r Clasificacion por de ingreso en cuartiles}
+```{r Operaciones de datos3: Clasificacion por de ingreso en cuartiles}
 cuartiles <- quantile(mapa_eco$Remuneracion_media, probs = c(0.25, 0.50, 0.75), na.rm = TRUE)
 bairescm_q <- mapa_eco %>%
   filter(provincia_id == 2, Remuneracion_media > 30000) %>% #Recortamos CABA
@@ -504,9 +502,19 @@ barrioscm_gg <- barrioscm_caba %>% filter(nombre %in% c("Almagro", "Caballito", 
 
 ```
 
+```{r Operaciones espaciales3: Joins espaciales}
+barrios_cm_sj <- st_join(bairescm_q, barrioscm_caba, join = st_intersects)
+
+barrioscm_sjs <- barrios_cm_sj %>%
+  select(CO_FRAC_RA, geometry, Remuneracion_media, cluster, nombre, comuna, perimetro_, area_metro) %>%
+  rename(barrios_nom = nombre)
+rm(bairescm_q)
+rm(barrioscm_caba)
+```
+
 Para llevar la comparativa en terminos de proximidad y accesibilidad geografica con barrios de clase media y alta, a fines de mantener una coherencia metodológica tomamos tres barrios, clasificados de acuerdo a su nivel de ingreso, como barrios de clase media baja, en el caso de Almagro, para clase media el barrio de Caballito, y para clase media alta a Palermo.
 
-```{r}
+```{r Carga mapa radiocensales CABA}
 #Cargamos un mapa de radiocensales de CABA para que nos oficie de mapa base para la visualización
 radio_bsas <-  st_read(url_radiocensalcaba)
 st_crs(radio_bsas)
@@ -514,7 +522,7 @@ sum(!st_is_valid(radio_bsas))
 radio_bsas <- st_transform(radio_bsas, 5347)
 ```
 
-```{r Septima visualizacion: Selección debarios }
+```{r Visualizaciones 8: Selección debarios }
 ggplot() + 
   geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
   geom_sf(data = barrioscm_gg, aes(fill = nombre), color = "white", size = 0.2, alpha = 0.2) +
@@ -524,7 +532,7 @@ ggplot() +
   labs(title = "Selección de barrios de Clase Media/Alta")
 ```
 
-```{r Agrupación y filtrado radiocensales por barrio con toma de  muestra}
+```{r Operaciones de datos4: Agrupación y filtrado radiocensales por barrio con toma de  muestra}
 
 barrioscm_selec <- barrioscm_sjs %>%
   filter(barrios_nom == "Palermo" & cluster == "Clase alta" | 
@@ -541,7 +549,7 @@ barrioscm_selec <- barrioscm_sjs %>%
 
 De esa selección tomamos 8 radiocensales de acuerdo al nivel de ingreso mas alto. Los dos barrios de clase media se encuentran en el centro geografico y urbano de la ciudad, salvo Palermo ubicado en zona norte, lindante con Retiro.
 
-```{r}
+```{r Visualizaciones9: Muestra de 8 Radiocensales por barrio de clase media y alta seleccionado }
 ggplot() + 
   geom_sf(data = radio_bsas, fill = "grey90", color = "black") +
   geom_sf(data = barrioscm_selec, aes(fill = barrios_nom), color = "white", size = 0.2) +
@@ -555,7 +563,7 @@ ggplot() +
   theme_minimal()
 ```
 
-```{r Operaciones espaciales: Buffers y conteo de escuelas}
+```{r Operaciones espaciales4: Buffers y conteo de escuelas}
 
 buff_cm_500  <- barrioscm_selec %>% st_buffer(500) %>% mutate(buffer = "500m")
 buff_cm_1000 <- barrioscm_selec %>% st_buffer(1000) %>% mutate(buffer = "1000m")
@@ -576,19 +584,21 @@ conteo_escuelas_cm <- escuelas_cmbuffer %>%
 
 ```
 
-```{r}
+```{r Tabla1: Conteo de escuelas}
+
 tablacm_resumen <- conteo_escuelas_cm %>%
   pivot_wider(
     names_from = buffer,
     values_from = total
   ) %>%
   mutate(Sum = rowSums(across(where(is.numeric))))
-print (tabla_resumen)
+print (tablacm_resumen)
+
 ```
 
 En primer lugar, cabe mencionar que, en terminos relativos, los totales no muestran variaciones significativas, destacandose ligeramente el barrio de Almagro, del mismo modo que en cada uno de los radios de cobertura, a pesar de que en terminos estrictos, Caballito es el centro geografico, que de todos modos le sigue con una pequeña diferencia. En el radio de cobertura media (1000 metros), Palermo aventaja a Caballito por 16 escuelas -en terminos relativos, apenas un 3.20%- y una diferencia similar -del %3.11 en este caso- para el radio de cobertura más lejano (es decir 2000 metros).
 
-```{r}
+```{r Graficos4: Conteo de escuelas por radio de cobertura}
 ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c(
@@ -596,12 +606,12 @@ ggplot(conteo_escuelas_cm, aes(x = barrios_nom, y = total, fill = buffer)) +
     "1000m" = "#d95f02",   
     "2000m" = "#7570b3"    
   )) +
-  labs(title = "Escuelas cercanas a barrios de clase media/alta",
-       x = "Barrio", y = "Cantidad de escuelas", fill = "Distancia") +
+  labs(title = "Escuelas de barrios de clase media/alta por Radio de Cobertura",
+       x = "Barrio", y = "Cantidad de escuelas", fill = "Distancia (Cobertura)") +
   theme_minimal()
 ```
 
-```{r}
+```{r Tabla2: Conteo de escuelas en barrios clase media y alta por tipo de gestión}
 conteocm_ges <- escuelas_cmbuffer %>% 
   filter(!is.na(barrios_nom), !is.na(buffer)) %>%
   st_drop_geometry() %>%           
@@ -620,7 +630,7 @@ print (tablacm_ges)
 
 Vemos que en todos los casos, siempre el numero de escuelas publicas sobrepasa al de establecimientos privados, destacando el caso de Palermo, en el cual el numero de estos ultimos se encuentra practicamente igualado al de los públicos.
 
-```{r}
+```{r Graficos5: Cantidad de escuelas en barrios de clase media y alta por gestión}
 ggplot(conteocm_ges, aes(x = barrios_nom, y = total, fill = tipo_gestion)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c(
@@ -635,7 +645,7 @@ ggplot(conteocm_ges, aes(x = barrios_nom, y = total, fill = tipo_gestion)) +
   theme_minimal()
 ```
 
-```{r}
+```{r  Visualizaciones 10: Escuelas por radio de cobertura en  radioscensales}
 buffers_cm_bind$buffer <- factor(buffers_cm_bind$buffer, 
                                  levels = c("500m", "1000m", "2000m"))
 
@@ -659,9 +669,9 @@ ggplot() +
                                "1000m" = "skyblue", 
                                "2000m" = "red")) +
   scale_color_manual(values = c("Privada" = "purple", 
-                                "Estatal" = "green")) +
+                                "Estatal" = "yellow")) +
   
-  labs(title = "Escuelas dentro de buffers de radios censales",
+  labs(title = "Escuelas por radio de cobertura en  radioscensales",
        subtitle = "Radio de cobertura a 500m, 1000m y 2000m - Colores por gestión",
        fill = "Distancia",
        color = "Gestión") +
@@ -671,29 +681,29 @@ ggplot() +
 
 En ambos mapas, total y facetado, puede observarse la concentracion del escuelas hacia el centro, reflejandose una merma hacia zona norte, radio de cobertura en el cual se encuentra Palermo. En el caso de este ultimo barrio, la cobertura media y la mas amplia alcanzan a cubrir la zona norcentrica, reflejandose una ligera diferencia en la cantidad de escuelas incluidas en el radio mas pequeño, respecto de Caballito y Almagro que toman de lleno la zonas mas multitudinaria en materia de establecimientos.
 
-```{r}
+```{r Visualizaciones 11: Facetado}
+escuelascm_filtradas <- st_filter(educ_sna, buffers_cm_bind)
+
 ggplot() +
-  geom_sf(data = radio_bsas, fill = "grey90", color = "black", size = 0.1) + #Mapa fondo
-  geom_sf(data = buffers_cm_bind, aes(color = buffer), fill = NA, size = 2) + #Buffers
-  geom_sf(data = escuelascm_filtradas, aes(fill = tipo_gestion), #Escueas en cobertura 
+  geom_sf(data = radio_bsas, fill = "grey90", color = "black", linewidth = 0.1) + # Mapa fondo
+  geom_sf(data = buffers_cm_bind, aes(color = buffer), fill = NA, linewidth = 2) + # Buffers
+  geom_sf(data = escuelascm_filtradas, aes(fill = tipo_gestion), # Escuelas en cobertura 
           color = "black", size = 1, shape = 21, alpha = 0.6) + 
-  scale_color_manual( #color de bordes buffers
+  scale_color_manual( # color de bordes buffers
     values = c("500m" = "red", 
                "1000m" = "blue", 
                "2000m" = "green")
   ) +
-  scale_fill_manual(    # Color de puntos de escuela
+  scale_fill_manual( # Color de puntos de escuela
     values = c("Privada" = "purple", 
                "Estatal" = "yellow")
   ) +
-  
   labs(
-    title = "Escuelas dentro de buffers de radios censales",
+    title = "Escuelas por radios de cobertura en radioscensales",
     subtitle = "Facetado por barrio",
     color = "Cobertura (Buffer)",
-    fill = "Tipo de gestión"
+    fill = "Tipo de gestion"
   ) +
-  
   theme_minimal() +
   facet_wrap(~ barrios_nom)
 ```
@@ -701,12 +711,21 @@ ggplot() +
 ```{r}
 buffers_cm_bind_wgs <- st_transform(buffers_cm_bind, 4326)
 escuelascm_filtradas_wgs <- st_transform(escuelascm_filtradas, 4326)
-radio_bsas_wgs <- st_transform(radio_bsas, 4326)
 
+escuelascm_filtradas_wgs <- escuelascm_filtradas_wgs %>%
+  mutate(
+    escuela = iconv(escuela, from = "", to = "UTF-8"),
+    tipo_gestion = iconv(tipo_gestion, from = "", to = "UTF-8")
+  )
+buffers_cm_bind_wgs <- buffers_cm_bind_wgs %>%
+  mutate(
+    buffer = iconv(buffer, from = "", to = "UTF-8")
+  )
+```
+
+```{r  Visualizaciones12: Interactivadad}
 leaflet() %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
-  
-  # Buffers primero (debajo)
   addPolylines(
     data = buffers_cm_bind_wgs,
     color = ~case_when(
@@ -720,33 +739,22 @@ leaflet() %>%
     options = pathOptions(interactive = FALSE),
     group = "Buffers"
   ) %>%
-  
-  # Escuelas después (arriba)
   addCircleMarkers(
     data = escuelascm_filtradas_wgs,
     color = "black", 
     fillColor = ~case_when(
       tipo_gestion == "Privada" ~ "purple",
-      tipo_gestion == "Estatal" ~ "yellow"
+      tipo_gestion == "Estatal" ~ "yellow",
+      TRUE ~ "grey"  # para "Sin dato"
     ),
     fillOpacity = 0.8,
     radius = 5,
-    popup = ~paste0("<strong>Escuela: </strong>", escuela,
-                    "<br><strong>Gestión: </strong>", tipo_gestion),
     group = "Escuelas"
-  ) %>%
-  
-  addLegend(
-    position = "bottomright",
-    colors = c("red", "blue", "green"),
-    labels = c("500m", "1000m", "2000m"),
-    title = "Buffer - Distancia"
   )
-
 
 ```
 
-```{r Geconsulta: preparación, message=FALSE, warning=FALSE}
+```{r Geconsulta3: preparación, message=FALSE, warning=FALSE}
 #Para la geoconsulta trabajamos con geometria de puntos, mas liviana.
 barrioscm_puntos <- barrioscm_selec %>%
   st_point_on_surface()%>%
@@ -762,7 +770,7 @@ escuelascm_500 <- st_filter(educ_sna, buffcm500_punto)
 
 ```
 
-```{r Geoconsulta OSRM}
+```{r Geoconsulta4: OSRM}
 
 #Configuramos OSRM en modo a pie
 options(osrm.profile = "foot")
@@ -785,14 +793,14 @@ print(df_tiemposcm_larga_500)
 
 ```
 
-```{r}
+```{r Tabla3: Resumen}
 summary(df_tiemposcm_larga_500$tiempo_min)
 
 ```
 
 Desde la accesibilidad geografica, tenemos una media de viaje a pie de casi 43 minutos, con una Maxima cercana a las 2 horas y una mediana ligeramente superior a los 41 minutos.
 
-```{r}
+```{r Graficos 6: Tiempo promedio por radiocensales}
 df_resumen <- df_tiemposcm_larga_500 %>%
   group_by(radio_id) %>%
   summarise(tiempo_promedio = mean(tiempo_min, na.rm = TRUE))
@@ -810,29 +818,41 @@ ggplot(df_resumen, aes(x = reorder(radio_id, tiempo_promedio), y = tiempo_promed
 
 ## 5. Analisis Comparativo y conclusión
 
-```{r}
-tabla_comparativa <- bind_rows(tabla_resumen, tablavul_resumen)
+```{r Tabla4: Comparativa}
+
+df_cm <- conteo_escuelas_cm %>%
+  mutate(grupo = case_when(
+    barrios_nom == "Almagro" ~ "Clase media baja",
+    barrios_nom == "Caballito" ~ "Clase media",
+    barrios_nom == "Palermo" ~ "Clase media alta"
+  ))
+
+df_vul <- conteo_escuelasvul %>%
+  mutate(grupo = "Vulnerable")
+
+conteo_comparado <- bind_rows(df_cm, df_vul)
+tabla_comparativa <- bind_rows(tablacm_resumen, tablavul_resumen)
 print(tabla_comparativa)
 
 ```
 
 Desde la proximidad geografica, adviertimos una notoria diferencia en cuanto a la cantidad de escuelas que los barrios vulnerables disponen. Para comenzar, los barrios de clase media y alta disponen de un total de escuelas que va desde 885 a las 1069 escuelas, contra las 214 a las 272 en el caso de los barrios vulnerables, notandose una brecha de 4 a 5 veces más escuelas alrededor de barrios medios/altos que de los vulnerables. Como dato llamativo, cabe destacar, respecto del radio cobertura mas próximo (500 metros), que el barrio de Palermo, casi lindante con el barrio de retiro, en el cual se encuentra la Villa 31 tenemos un %336 más de escuelas: a medida que el radio crece , la brecha sigue igual o mayor. Las diferencias apenas se atemperan en los otros radios, mostrando patrones de diferencia similares.
 
-```{r}
+```{r Graficos8: Escuelas por radio de cobertura y gurpo socio economico}
 
 ggplot(data = conteo_comparado, aes(x = buffer, y = total, fill = grupo)) +
   geom_col(position = "dodge") +
   labs(
-    title = "Cantidad de escuelas por Radio de Cobertura y Grupo Socioeconómico",
+    title = "Cantidad de escuelas por Radio de Cobertura y Grupo Socioeconomico",
     x = "Buffer",
     y = "Total de escuelas",
-    fill = "Grupo socioeconómico"
+    fill = "Grupo socioeconomico"
   ) +
   theme_minimal()+
   coord_flip()
 ```
 
-```{r}
+```{r Tabla5: Comparativa por tipo de gestion}
 tabla_ges_unida <- bind_rows(
   tablacm_ges %>% mutate(grupo = "Media/Alta"),
   tablavul_ges %>% mutate(grupo = "Vulnerable")
@@ -842,25 +862,11 @@ print(tabla_ges_unida)
 
 Respecto del tipo de gestion encontramos una brecha más amplia aun, dado que en el caso de las escuelas vulnerables la educacion estatal es casi exclusiva, alrededor deun %80, a diferencia de los sectores medios altos, donde si bien la gestion continua siendo mayoritariamente estatal, la oferta se encuenta mas balanceada, sin olvidar que se trata de una cercana a Palermo.
 
-```{r}
-ggplot(tabla_ges_unida, aes(x = barrios_nom)) +
-  geom_col(aes(y = Estatal, fill = "Estatal"), position = "dodge") +
-  geom_col(aes(y = Privada, fill = "Privada"), position = "dodge") +
-  scale_fill_manual(
-    name = "Tipo de gestión",
-    values = c("Estatal" = "#1b9e77", "Privada" = "#d95f02")
-  ) +
-  labs(
-    title = "Cantidad de escuelas por barrio y tipo de gestión",
-    x = "Barrio",
-    y = "Total de escuelas"
-  ) +
-  theme_minimal() 
-```
+`{rGraficos9: Escuelas por Barrio y Gestion} ggplot(tabla_ges_unida, aes(x = barrios_nom)) +   geom_col(aes(y = Estatal, fill = "Estatal"), position = "dodge") +   geom_col(aes(y = Privada, fill = "Privada"), position = "dodge") +   scale_fill_manual(     name = "Tipo de gestión",     values = c("Estatal" = "#1b9e77", "Privada" = "#d95f02")   ) +   labs(     title = "Cantidad de escuelas por barrio y tipo de gestión",     x = "Barrio",     y = "Total de escuelas"   ) +   theme_minimal()`
 
 Respecto n barrios populares casi todos los valores están concentrados entre 0 y 28 min, mientras que en barrios medios/altos, además de los tiemposmenores a los 30 minutos psexiste un subconjunto significativo que tiene 1 hora o más viaje. Es decir que en una primera instancia desde la accesibilidad geografica, las escuelas ubicadas en barrios vulnerables muestran un mayor grado.
 
-```{r}
+```{r Operaciones de datos5: Unificacion geoconsulta}
 df_tiemposcm_larga_5002 <- df_tiemposcm_larga_500 %>%
   mutate(grupo = "Clase media y alta")
 
@@ -874,12 +880,12 @@ df_tiempos_unificado_5002 <- bind_rows(df_tiemposcm_larga_5002, df_tiemposvul_la
 
 ```
 
-```{r}
+```{r Graficos10: Comparativa de tiempo a escuelas}
 ggplot(df_tiempos_unificado_5002, aes(x = reorder(radio_id, tiempo_min), y = tiempo_min, fill = grupo)) +
   geom_col(position = position_dodge()) +
   coord_flip() +
   labs(
-    title = "Tiempo a escuelas (500m) por radio censal y grupo",
+    title = "Comoparativa de Tiempo a escuelas (500m) por radio censal y grupo",
     x = "Radio censal",
     y = "Tiempo (minutos)",
     fill = "Grupo"

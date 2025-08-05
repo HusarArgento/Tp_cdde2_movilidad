@@ -86,14 +86,14 @@ addmargins(tabla_comparativa)
 
 
 
-library(ggplot2)
+  library(ggplot2)
 
-ggplot(data = conteo_unificado, aes(x = buffer, y = total, fill = grupo)) +
-  geom_col(position = "dodge") +
-  labs(
-    title = "Cantidad de escuelas por buffer y grupo socioeconómico",
-    x = "Buffer",
-    y = "Total de escuelas",
-    fill = "Grupo socioeconómico"
-  ) +
-  theme_minimal()
+  ggplot(data = conteo_unificado, aes(x = buffer, y = total, fill = grupo)) +
+    geom_col(position = "dodge") +
+    labs(
+      title = "Cantidad de escuelas por buffer y grupo socioeconómico",
+      x = "Buffer",
+      y = "Total de escuelas",
+      fill = "Grupo socioeconómico"
+    ) +
+    theme_minimal()

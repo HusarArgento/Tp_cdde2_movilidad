@@ -215,7 +215,7 @@ conteo_escuelas_cm <- escuelas_cmbuffer %>%
 
 ```
 
-```{r Primera Tabla}
+```{r  Tabla}
 tabla_resumen <- conteo_escuelas_cm %>%
   pivot_wider(
     names_from = buffer,

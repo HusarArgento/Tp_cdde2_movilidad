@@ -500,32 +500,26 @@ print(df_tiemposvul_larga_500)
 
 ```{r}
 # Normalizamos columnas antes de unir
-df_tiemposcm_larga_500 <- df_tiemposcm_larga_500 %>%
+df_tiemposcm_larga_5002 <- df_tiemposcm_larga_500 %>%
   mutate(grupo = "Clase media y alta")
 
-#df_tiemposcm_larga_500 <- df_tiemposcm_larga_500 %>%
- # mutate(grupo_detalle = case_when(
-  #  barrios_nom == "Almagro" ~ "Clase media baja",
-   # barrios_nom == "Caballito" ~ "Clase media",
-    #barrios_nom == "Palermo" ~ "Clase media alta",
-    #TRUE ~ "Otro"
-  #))
-df_tiemposvul_larga_500 <- df_tiemposvul_larga_500 %>%
+
+df_tiemposvul_larga_5002 <- df_tiemposvul_larga_500 %>%
   mutate(grupo = "Vulnerable")
 
 # Unificamos
-df_tiempos_unificado_500 <- bind_rows(df_tiemposcm_larga_500, df_tiemposvul_larga_500)
+df_tiempos_unificado_5002 <- bind_rows(df_tiemposcm_larga_5002, df_tiemposvul_larga_5002)
 
 # Verificamos conteo por grupo
-df_tiempos_unificado_500 %>% count(grupo)
-print(df_tiempos_unificado_500)
+df_tiempos_unificado_5002 %>% count(grupo)
+print(df_tiempos_unificado_5002)
 
 ```
 
 `
 
 ```{r}
-resumen_tiempos <- df_tiempos_unificado_500 %>%
+resumen_tiempos <- df_tiempos_unificado_5002 %>%
   group_by(grupo, buffer) %>%
   summarise(
     tiempo_promedio = mean(tiempo_min, na.rm = TRUE),
@@ -552,7 +546,7 @@ ggplot(resumen_tiempos, aes(x = buffer, y = tiempo_promedio, fill = grupo)) +
 ```{r}
 
 
-ggplot(df_tiempos_unificado_500, aes(x = reorder(radio_id, tiempo_min), y = tiempo_min, fill = grupo)) +
+ggplot(df_tiempos_unificado_5002, aes(x = reorder(radio_id, tiempo_min), y = tiempo_min, fill = grupo)) +
   geom_col(position = position_dodge()) +
   coord_flip() +
   labs(
